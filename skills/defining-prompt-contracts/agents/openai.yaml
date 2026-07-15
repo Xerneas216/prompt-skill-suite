@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prompt Contract Designer"
+  short_description: "Turn briefs into explicit prompt contracts"
+  default_prompt: "Use $defining-prompt-contracts to turn this brief into an explicit prompt contract."
