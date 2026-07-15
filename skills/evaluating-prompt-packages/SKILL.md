@@ -1,6 +1,6 @@
 ---
 name: evaluating-prompt-packages
-description: Use when a PromptPackage needs representative evaluation cases, an executable provider-neutral fixture, repeated runtime tests, baseline comparison, promotion criteria, or an honest not-run result.
+description: Use when an in-progress PromptPackage needs representative cases, an executable provider-neutral fixture, repeated runtime tests, baseline comparison, promotion criteria, or an honest not-run result.
 ---
 
 # Evaluating Prompt Packages

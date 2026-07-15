@@ -1,6 +1,6 @@
 ---
 name: defining-prompt-contracts
-description: Use when a prompt-building request has incomplete, ambiguous, or conflicting requirements, or when goals, success criteria, evidence, permissions, output requirements, model settings, or stop conditions must be made explicit before drafting.
+description: Use when an in-progress PromptPackage needs incomplete, ambiguous, or conflicting requirements normalized into explicit goals, success criteria, evidence, permissions, output requirements, model settings, and stop conditions.
 ---
 
 # Defining Prompt Contracts

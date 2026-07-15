@@ -1,6 +1,6 @@
 ---
 name: prompting-general-tasks
-description: Use when a prompt package targets question answering, grounded research, analysis, writing, rewriting, summarization, extraction, classification, or other non-software task behavior.
+description: Use when an in-progress PromptPackage has a ready contract for question answering, grounded research, analysis, writing, rewriting, summarization, extraction, classification, or other non-software behavior.
 ---
 
 # Prompting General Tasks

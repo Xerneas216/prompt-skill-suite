@@ -1,6 +1,6 @@
 ---
 name: reviewing-prompt-packages
-description: Use when a PromptPackage or prompt draft needs semantic static review for duplication, contradiction, overconstraint, missing requirements, invalid tool references, unsupported claims, or minimal repair before evaluation or delivery.
+description: Use when an in-progress PromptPackage needs semantic static review for duplication, contradiction, overconstraint, missing requirements, invalid tool references, unsupported claims, or minimal repair before evaluation or delivery.
 ---
 
 # Reviewing Prompt Packages

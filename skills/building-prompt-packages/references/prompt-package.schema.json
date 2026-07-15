@@ -1,0 +1,435 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/prompt-package-v1.schema.json",
+  "title": "PromptPackage v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "request",
+    "assumptions",
+    "model_profile",
+    "prompt_contract",
+    "messages",
+    "response_format",
+    "verification",
+    "provenance"
+  ],
+  "properties": {
+    "version": { "const": "1.0" },
+    "request": { "$ref": "#/$defs/request" },
+    "assumptions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nonemptyString" },
+      "uniqueItems": true
+    },
+    "model_profile": { "$ref": "#/$defs/modelProfile" },
+    "prompt_contract": { "$ref": "#/$defs/promptContract" },
+    "messages": { "$ref": "#/$defs/messages" },
+    "tool_policy": { "$ref": "#/$defs/toolPolicy" },
+    "response_format": { "$ref": "#/$defs/responseFormat" },
+    "verification": { "$ref": "#/$defs/verification" },
+    "provenance": { "$ref": "#/$defs/provenance" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "request": {
+            "properties": { "uses_tools": { "const": true } },
+            "required": ["uses_tools"]
+          }
+        }
+      },
+      "then": { "required": ["tool_policy"] },
+      "else": { "not": { "required": ["tool_policy"] } }
+    }
+  ],
+  "$defs": {
+    "nonemptyString": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "stringList": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonemptyString" }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "original_goal",
+        "scenario",
+        "audience",
+        "language",
+        "explicit_values",
+        "uses_tools",
+        "interaction_mode",
+        "delivery"
+      ],
+      "properties": {
+        "original_goal": { "$ref": "#/$defs/nonemptyString" },
+        "scenario": { "enum": ["general", "agent", "software", "hybrid"] },
+        "audience": { "$ref": "#/$defs/nonemptyString" },
+        "language": { "$ref": "#/$defs/nonemptyString" },
+        "explicit_values": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^/(request|model_profile|prompt_contract|messages|tool_policy|response_format)(/.*)?$"
+          },
+          "additionalProperties": true
+        },
+        "uses_tools": { "type": "boolean" },
+        "interaction_mode": { "enum": ["single_turn", "multi_turn"] },
+        "delivery": { "enum": ["conversation", "files"] }
+      }
+    },
+    "modelProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "api", "text_verbosity", "reasoning_effort"],
+      "properties": {
+        "model": { "$ref": "#/$defs/nonemptyString" },
+        "api": { "const": "responses" },
+        "text_verbosity": { "enum": ["low", "medium", "high"] },
+        "reasoning_effort": { "enum": ["none", "low", "medium", "high", "xhigh", "max"] },
+        "reasoning_mode": { "enum": ["standard", "pro"] },
+        "reasoning_context": { "enum": ["auto", "current_turn", "all_turns"] }
+      }
+    },
+    "promptContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "personality",
+        "collaboration",
+        "goal",
+        "success_criteria",
+        "constraints",
+        "evidence",
+        "permissions",
+        "output",
+        "stop_rules"
+      ],
+      "properties": {
+        "role": { "$ref": "#/$defs/nonemptyString" },
+        "personality": { "$ref": "#/$defs/stringList" },
+        "collaboration": { "$ref": "#/$defs/stringList" },
+        "goal": { "$ref": "#/$defs/nonemptyString" },
+        "success_criteria": { "$ref": "#/$defs/stringList" },
+        "constraints": { "$ref": "#/$defs/stringList" },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requirements", "missing_evidence_behavior"],
+          "properties": {
+            "requirements": { "$ref": "#/$defs/stringList" },
+            "missing_evidence_behavior": { "$ref": "#/$defs/nonemptyString" }
+          }
+        },
+        "permissions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["allowed", "forbidden"],
+          "properties": {
+            "allowed": { "$ref": "#/$defs/stringList" },
+            "requires_approval": { "$ref": "#/$defs/stringList" },
+            "forbidden": { "$ref": "#/$defs/stringList" }
+          }
+        },
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["language", "format", "required_content"],
+          "properties": {
+            "language": { "$ref": "#/$defs/nonemptyString" },
+            "format": { "$ref": "#/$defs/nonemptyString" },
+            "required_content": { "$ref": "#/$defs/stringList" },
+            "length_limit": { "$ref": "#/$defs/nonemptyString" }
+          }
+        },
+        "stop_rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["success", "blocked"],
+          "properties": {
+            "success": { "$ref": "#/$defs/stringList" },
+            "blocked": { "$ref": "#/$defs/stringList" },
+            "handoff": { "$ref": "#/$defs/stringList" }
+          }
+        }
+      }
+    },
+    "messages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["system", "developer", "user_template", "variables"],
+      "properties": {
+        "system": { "$ref": "#/$defs/nonemptyString" },
+        "developer": { "$ref": "#/$defs/nonemptyString" },
+        "user_template": { "$ref": "#/$defs/nonemptyString" },
+        "variables": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "description", "required", "source"],
+            "properties": {
+              "name": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+              "description": { "$ref": "#/$defs/nonemptyString" },
+              "required": { "type": "boolean" },
+              "source": { "enum": ["user", "trusted_context", "runtime"] }
+            }
+          }
+        }
+      }
+    },
+    "toolPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tools", "prerequisites", "routing", "fallbacks"],
+      "properties": {
+        "tools": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "purpose",
+              "use_when",
+              "input_schema",
+              "output_schema",
+              "returns",
+              "errors",
+              "limits",
+              "citation_support",
+              "side_effect"
+            ],
+            "properties": {
+              "name": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$" },
+              "purpose": { "$ref": "#/$defs/nonemptyString" },
+              "use_when": { "$ref": "#/$defs/nonemptyString" },
+              "input_schema": { "type": "object", "minProperties": 1 },
+              "output_schema": { "type": "object", "minProperties": 1 },
+              "returns": { "$ref": "#/$defs/stringList" },
+              "errors": { "$ref": "#/$defs/stringList" },
+              "limits": { "$ref": "#/$defs/stringList" },
+              "citation_support": { "enum": ["none", "source_handles", "claim_level"] },
+              "side_effect": { "enum": ["none", "read", "write", "destructive"] },
+              "idempotency": { "enum": ["supported", "not_supported", "unknown"] },
+              "status_recovery": { "enum": ["supported", "not_supported", "unknown"] },
+              "contract_ref": { "$ref": "#/$defs/nonemptyString" }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": { "side_effect": { "enum": ["write", "destructive"] } },
+                  "required": ["side_effect"]
+                },
+                "then": { "required": ["idempotency", "status_recovery"] }
+              }
+            ]
+          }
+        },
+        "prerequisites": { "$ref": "#/$defs/stringList" },
+        "routing": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "instruction"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$" },
+              "instruction": { "$ref": "#/$defs/nonemptyString" },
+              "tool": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$" },
+              "depends_on": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$" }
+              }
+            }
+          }
+        },
+        "fallbacks": { "$ref": "#/$defs/stringList" },
+        "approvals": { "$ref": "#/$defs/stringList" },
+        "ptc": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "stage",
+            "eligible_tools",
+            "deterministic_reduction",
+            "input_schema",
+            "output_schema",
+            "stop_conditions",
+            "retry_policy"
+          ],
+          "properties": {
+            "stage": { "$ref": "#/$defs/nonemptyString" },
+            "eligible_tools": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$" }
+            },
+            "deterministic_reduction": {
+              "enum": ["filter", "sort", "join", "deduplicate", "aggregate", "batch"]
+            },
+            "input_schema": { "type": "object", "minProperties": 1 },
+            "output_schema": { "type": "object", "minProperties": 1 },
+            "stop_conditions": { "$ref": "#/$defs/stringList" },
+            "retry_policy": { "$ref": "#/$defs/nonemptyString" }
+          }
+        },
+        "long_task": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["updates", "resumable_state", "handoff"],
+          "properties": {
+            "updates": { "$ref": "#/$defs/stringList" },
+            "resumable_state": { "$ref": "#/$defs/stringList" },
+            "handoff": { "$ref": "#/$defs/stringList" }
+          }
+        }
+      }
+    },
+    "responseFormat": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "structure"],
+          "properties": {
+            "type": { "const": "text" },
+            "structure": { "$ref": "#/$defs/stringList" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "name", "schema"],
+          "properties": {
+            "type": { "const": "json_schema" },
+            "name": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+            "schema": { "type": "object", "minProperties": 1 },
+            "strict": { "type": "boolean" }
+          }
+        }
+      ]
+    },
+    "staticReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "findings"],
+      "properties": {
+        "status": { "enum": ["pass", "fail"] },
+        "findings": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonemptyString" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "fail" } }, "required": ["status"] },
+          "then": { "properties": { "findings": { "minItems": 1 } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "pass" } }, "required": ["status"] },
+          "then": { "properties": { "findings": { "maxItems": 0 } } }
+        }
+      ]
+    },
+    "evaluationStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "evidence"],
+      "properties": {
+        "status": { "enum": ["not_run", "pass", "fail"] },
+        "evidence": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonemptyString" }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "enum": ["pass", "fail"] } },
+            "required": ["status"]
+          },
+          "then": { "properties": { "evidence": { "minItems": 1 } } }
+        }
+      ]
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "static_review",
+        "dynamic_evaluation",
+        "baseline_comparison",
+        "automatic_repair_rounds",
+        "residual_risks"
+      ],
+      "properties": {
+        "static_review": { "$ref": "#/$defs/staticReview" },
+        "dynamic_evaluation": { "$ref": "#/$defs/evaluationStatus" },
+        "baseline_comparison": { "$ref": "#/$defs/evaluationStatus" },
+        "automatic_repair_rounds": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "residual_risks": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonemptyString" }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sources", "generated_at", "schema_version", "participating_modules"],
+      "properties": {
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["title", "url"],
+            "properties": {
+              "title": { "$ref": "#/$defs/nonemptyString" },
+              "url": { "type": "string", "format": "uri" }
+            }
+          }
+        },
+        "generated_at": { "type": "string", "format": "date-time" },
+        "schema_version": { "const": "1.0" },
+        "participating_modules": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "building-prompt-packages",
+              "defining-prompt-contracts",
+              "prompting-general-tasks",
+              "prompting-tool-agents",
+              "prompting-software-engineering",
+              "reviewing-prompt-packages",
+              "evaluating-prompt-packages"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

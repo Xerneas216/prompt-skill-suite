@@ -1,6 +1,6 @@
 ---
 name: prompting-tool-agents
-description: Use when a prompt package governs tool selection, retrieval, citations, side effects, approvals, long-running agent work, programmatic tool calling, or recovery from tool failures and empty results.
+description: Use when an in-progress PromptPackage has a ready contract involving tool selection, retrieval, citations, side effects, approvals, long-running work, programmatic tool calling, or tool failure recovery.
 ---
 
 # Prompting Tool Agents

@@ -1,6 +1,6 @@
 ---
 name: prompting-software-engineering
-description: Use when a prompt package targets software explanation, diagnosis, implementation, bug fixing, refactoring, code review, testing, architecture planning, frontend changes, or visual verification.
+description: Use when an in-progress PromptPackage has a ready contract for software explanation, diagnosis, implementation, bug fixing, refactoring, code review, testing, architecture planning, frontend changes, or visual verification.
 ---
 
 # Prompting Software Engineering
