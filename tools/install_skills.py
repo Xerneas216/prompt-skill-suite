@@ -26,7 +26,11 @@ PROCRAFT_SKILLS = [
     "reviewing-prompt-packages",
     "evaluating-prompt-packages",
 ]
-KNOWN_LEGACY_MANIFEST_PATH = Path(__file__).with_name("legacy-v0.1.0-manifest.json")
+KNOWN_LEGACY_MANIFEST_PATHS = [
+    Path(__file__).with_name("legacy-v0.1.0-manifest.json"),
+    Path(__file__).with_name("legacy-v0.1.0-windows-manifest.json"),
+]
+LEGACY_MANIFEST_KEYS = {"files", "manifest_version", "skills", "source"}
 
 
 class InstallerError(RuntimeError):
@@ -147,14 +151,28 @@ def _validate_manifest_shape(manifest: Any, label: str) -> tuple[list[str], dict
     return skills, files
 
 
+def _validate_installed_legacy_manifest(manifest: dict[str, Any]) -> tuple[list[str], dict[str, str]]:
+    if set(manifest) != LEGACY_MANIFEST_KEYS:
+        raise InstallerError("Legacy manifest must contain exactly files, manifest_version, skills, and source")
+    if manifest.get("manifest_version") != "1.0":
+        raise InstallerError("Legacy manifest_version must be 1.0")
+    source = manifest.get("source")
+    if not isinstance(source, str) or not source.strip():
+        raise InstallerError("Legacy manifest source must be a non-empty string")
+    return _validate_manifest_shape(manifest, "Legacy manifest")
+
+
 def _load_known_legacy_manifests() -> list[dict[str, Any]]:
     """Load committed trust anchors; callers cannot supply migration trust."""
-    try:
-        manifest = json.loads(KNOWN_LEGACY_MANIFEST_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise InstallerError(f"Cannot load legacy trust anchor: {KNOWN_LEGACY_MANIFEST_PATH}") from exc
-    _validate_manifest_shape(manifest, "Legacy trust anchor")
-    return [manifest]
+    manifests: list[dict[str, Any]] = []
+    for path in KNOWN_LEGACY_MANIFEST_PATHS:
+        try:
+            manifest = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise InstallerError(f"Cannot load legacy trust anchor: {path}") from exc
+        _validate_manifest_shape(manifest, "Legacy trust anchor")
+        manifests.append(manifest)
+    return manifests
 
 
 def _read_json(path: Path, label: str) -> dict[str, Any]:
@@ -169,7 +187,7 @@ def _read_json(path: Path, label: str) -> dict[str, Any]:
 
 def _trusted_legacy_state(target: Path, legacy_manifest_path: Path) -> dict[str, Any]:
     installed = _read_json(legacy_manifest_path, "legacy manifest")
-    installed_skills, installed_files = _validate_manifest_shape(installed, "Legacy manifest")
+    installed_skills, installed_files = _validate_installed_legacy_manifest(installed)
     trusted: dict[str, Any] | None = None
     for candidate in _load_known_legacy_manifests():
         candidate_skills, candidate_files = _validate_manifest_shape(candidate, "Legacy trust anchor")
@@ -276,6 +294,13 @@ def _restore_legacy_backup(
     return errors
 
 
+def _cleanup_staging_root(staging_root: Path) -> None:
+    try:
+        shutil.rmtree(staging_root)
+    except FileNotFoundError:
+        return
+
+
 def install_skills(source: Path, target: Path, dry_run: bool = False) -> dict[str, Any]:
     """Install discovered skills or migrate an exact trusted v0.1.0 installation."""
     source = source.resolve()
@@ -318,16 +343,15 @@ def install_skills(source: Path, target: Path, dry_run: bool = False) -> dict[st
     target.mkdir(parents=True, exist_ok=True)
     staging_root = Path(tempfile.mkdtemp(dir=target, prefix=STAGING_PREFIX))
     staged_new_root = staging_root / "new"
-    staged_new_root.mkdir()
     staged_manifest = staged_new_root / MANIFEST_NAME
     backup_root = staging_root / "backup"
     published: list[tuple[Path, tuple[int, int]]] = []
     manifest_identity: tuple[int, int] | None = None
     manifest_bytes = b""
-    keep_stage = False
     migration_started = False
 
     try:
+        staged_new_root.mkdir()
         for relative, source_path in source_files:
             staged_path = staged_new_root / Path(relative)
             staged_path.parent.mkdir(parents=True, exist_ok=True)
@@ -391,14 +415,22 @@ def install_skills(source: Path, target: Path, dry_run: bool = False) -> dict[st
             if not rollback_errors and not _legacy_state_is_current(target, legacy_manifest_path, legacy_state):
                 rollback_errors.append("restored legacy installation failed verification")
         if rollback_errors:
-            keep_stage = True
             raise InstallerError(
                 f"Installation failed and rollback was incomplete: {'; '.join(rollback_errors)}"
             ) from exc
+        try:
+            _cleanup_staging_root(staging_root)
+        except OSError as cleanup_exc:
+            raise InstallerError(
+                f"Installation failed; rollback completed, but staging cleanup failed: {cleanup_exc}"
+            ) from exc
         raise
-    finally:
-        if not keep_stage and staging_root.exists():
-            shutil.rmtree(staging_root, ignore_errors=True)
+    try:
+        _cleanup_staging_root(staging_root)
+    except OSError as exc:
+        raise InstallerError(
+            f"Installation was published and verified, but staging cleanup failed: {exc}"
+        ) from exc
     return manifest
 
 

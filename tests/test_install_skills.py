@@ -17,6 +17,7 @@ from install_skills import InstallerError, install_skills  # noqa: E402
 LEGACY_MANIFEST_NAME = ".prompt-skill-suite-manifest.json"
 PROCRAFT_MANIFEST_NAME = ".procraft-manifest.json"
 KNOWN_LEGACY_MANIFEST = ROOT / "tools" / "legacy-v0.1.0-manifest.json"
+KNOWN_WINDOWS_LEGACY_MANIFEST = ROOT / "tools" / "legacy-v0.1.0-windows-manifest.json"
 INTERNAL_SKILLS = [
     "defining-prompt-contracts",
     "prompting-general-tasks",
@@ -44,6 +45,13 @@ def file_hashes(root, skill_names):
     return files
 
 
+def write_json(path, value):
+    path.write_text(
+        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def write_suite(root, entry_name, marker):
     names = [entry_name, *INTERNAL_SKILLS]
     for name in names:
@@ -60,10 +68,7 @@ def write_legacy_install(target):
         "skills": skill_names,
         "files": file_hashes(target, skill_names),
     }
-    (target / LEGACY_MANIFEST_NAME).write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    write_json(target / LEGACY_MANIFEST_NAME, manifest)
     return manifest
 
 
@@ -78,39 +83,91 @@ def tree_snapshot(root):
     }
 
 
-class InstallSkillsTests(unittest.TestCase):
-    def test_v0_1_0_installed_skill_hashes_are_committed_as_the_trust_anchor(self):
-        release_files = subprocess.run(
-            ["git", "ls-tree", "-r", "--name-only", "v0.1.0", "--", "skills"],
+def v0_1_0_installed_blobs():
+    release_files = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", "v0.1.0", "--", "skills"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    skill_names = sorted(["building-prompt-packages", *INTERNAL_SKILLS])
+    return skill_names, {
+        relative.removeprefix("skills/"): subprocess.run(
+            ["git", "show", f"v0.1.0:{relative}"],
             cwd=ROOT,
             check=True,
             capture_output=True,
-            text=True,
-        ).stdout.splitlines()
+        ).stdout
+        for relative in release_files
+        if relative.split("/", 2)[1] in skill_names
+    }
+
+
+def write_v0_1_0_release_install(target, windows_crlf_yaml=False):
+    skill_names, release_blobs = v0_1_0_installed_blobs()
+    for relative, blob in release_blobs.items():
+        destination = target / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if windows_crlf_yaml and relative.endswith("/agents/openai.yaml"):
+            blob = blob.replace(b"\n", b"\r\n")
+        destination.write_bytes(blob)
+    manifest = {
+        "files": file_hashes(target, skill_names),
+        "manifest_version": "1.0",
+        "skills": skill_names,
+        "source": "D:\\Codex\\Common\\prompt-skill-suite\\skills",
+    }
+    write_json(target / LEGACY_MANIFEST_NAME, manifest)
+    return manifest
+
+
+class InstallSkillsTests(unittest.TestCase):
+    def test_v0_1_0_installed_skill_variants_are_derived_from_the_tag(self):
         # The v0.1.0 installer sorted directories and never published skills/.gitkeep.
-        release_skill_names = sorted(["building-prompt-packages", *INTERNAL_SKILLS])
+        release_skill_names, release_blobs = v0_1_0_installed_blobs()
         release_hashes = {
-            relative.removeprefix("skills/"): hashlib.sha256(
-                subprocess.run(
-                    ["git", "show", f"v0.1.0:{relative}"],
-                    cwd=ROOT,
-                    check=True,
-                    capture_output=True,
-                ).stdout
-            ).hexdigest()
-            for relative in release_files
-            if relative.split("/", 2)[1] in release_skill_names
+            relative: hashlib.sha256(blob).hexdigest()
+            for relative, blob in release_blobs.items()
         }
-        if not KNOWN_LEGACY_MANIFEST.is_file():
-            self.fail("tools/legacy-v0.1.0-manifest.json must be committed")
-        manifest = json.loads(KNOWN_LEGACY_MANIFEST.read_text(encoding="utf-8"))
-        self.assertEqual("v0.1.0", manifest.get("release"))
-        self.assertEqual("1.0", manifest.get("manifest_version"))
-        self.assertEqual(
-            release_skill_names,
-            manifest.get("skills"),
-        )
-        self.assertEqual(release_hashes, manifest.get("files"))
+        windows_hashes = {
+            relative: hashlib.sha256(
+                blob.replace(b"\n", b"\r\n")
+                if relative.endswith("/agents/openai.yaml")
+                else blob
+            ).hexdigest()
+            for relative, blob in release_blobs.items()
+        }
+        expected_variants = [
+            (KNOWN_LEGACY_MANIFEST, "git-tag", release_hashes),
+            (KNOWN_WINDOWS_LEGACY_MANIFEST, "windows-crlf-yaml", windows_hashes),
+        ]
+        for path, variant, expected_hashes in expected_variants:
+            with self.subTest(variant=variant):
+                if not path.is_file():
+                    self.fail(f"{path.relative_to(ROOT).as_posix()} must be committed")
+                manifest = json.loads(path.read_text(encoding="utf-8"))
+                self.assertEqual("v0.1.0", manifest.get("release"))
+                self.assertEqual(variant, manifest.get("variant"))
+                self.assertEqual("1.0", manifest.get("manifest_version"))
+                self.assertEqual(release_skill_names, manifest.get("skills"))
+                self.assertEqual(expected_hashes, manifest.get("files"))
+
+    def test_default_loader_migrates_both_v0_1_0_install_variants(self):
+        for variant, windows_crlf_yaml in [("git-tag", False), ("windows-crlf-yaml", True)]:
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
+                source = Path(source_dir)
+                target = Path(target_dir)
+                new_skills = write_suite(source, "procraft", "v0.2.0")
+                write_v0_1_0_release_install(target, windows_crlf_yaml=windows_crlf_yaml)
+
+                result = install_skills(source, target)
+
+                self.assertEqual("legacy_migration", result["mode"])
+                self.assertEqual(new_skills, result["skills"])
+                self.assertTrue((target / PROCRAFT_MANIFEST_NAME).is_file())
+                self.assertFalse((target / LEGACY_MANIFEST_NAME).exists())
+                self.assertFalse((target / "building-prompt-packages").exists())
 
     def test_root_cli_dry_run_does_not_write(self):
         with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
@@ -174,6 +231,9 @@ class InstallSkillsTests(unittest.TestCase):
             target = Path(target_dir)
             new_skills = write_suite(source, "procraft", "v0.2.0")
             legacy_manifest = write_legacy_install(target)
+            installed_manifest = dict(legacy_manifest)
+            installed_manifest["source"] = "E:\\a-different-checkout\\skills"
+            write_json(target / LEGACY_MANIFEST_NAME, installed_manifest)
 
             with patch(
                 "install_skills._load_known_legacy_manifests",
@@ -232,6 +292,34 @@ class InstallSkillsTests(unittest.TestCase):
                     "install_skills._load_known_legacy_manifests",
                     return_value=[legacy_manifest],
                     create=True,
+                ):
+                    with self.assertRaises(InstallerError):
+                        install_skills(source, target)
+
+                self.assertEqual(before, tree_snapshot(target))
+
+    def test_legacy_manifest_shape_version_and_source_are_strict(self):
+        mutations = {
+            "extra_field": lambda manifest: manifest.update({"release": "v0.1.0"}),
+            "missing_source": lambda manifest: manifest.pop("source"),
+            "wrong_version": lambda manifest: manifest.update({"manifest_version": "2.0"}),
+            "empty_source": lambda manifest: manifest.update({"source": ""}),
+            "non_string_source": lambda manifest: manifest.update({"source": 7}),
+        }
+        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
+            source = Path(source_dir)
+            target = Path(target_dir)
+            write_suite(source, "procraft", "v0.2.0")
+            trusted_manifest = write_legacy_install(target)
+            for case, mutate in mutations.items():
+                installed_manifest = dict(trusted_manifest)
+                mutate(installed_manifest)
+                write_json(target / LEGACY_MANIFEST_NAME, installed_manifest)
+                before = tree_snapshot(target)
+
+                with self.subTest(case=case), patch(
+                    "install_skills._load_known_legacy_manifests",
+                    return_value=[trusted_manifest],
                 ):
                     with self.assertRaises(InstallerError):
                         install_skills(source, target)
@@ -302,6 +390,35 @@ class InstallSkillsTests(unittest.TestCase):
                 if path.is_dir() and "stage" in path.name.casefold()
             ]
             self.assertEqual([], leaked_stages)
+
+    def test_cleanup_failure_reports_published_migration_without_rolling_it_back(self):
+        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
+            source = Path(source_dir)
+            target = Path(target_dir)
+            new_skills = write_suite(source, "procraft", "v0.2.0")
+            legacy_manifest = write_legacy_install(target)
+
+            with patch(
+                "install_skills._load_known_legacy_manifests",
+                return_value=[legacy_manifest],
+            ), patch(
+                "install_skills._cleanup_staging_root",
+                side_effect=OSError("simulated cleanup failure"),
+            ) as cleanup:
+                with self.assertRaisesRegex(
+                    InstallerError,
+                    "published and verified.*staging cleanup failed",
+                ):
+                    install_skills(source, target)
+
+            cleanup.assert_called_once()
+            self.assertTrue((target / PROCRAFT_MANIFEST_NAME).is_file())
+            self.assertFalse((target / LEGACY_MANIFEST_NAME).exists())
+            self.assertFalse((target / "building-prompt-packages").exists())
+            self.assertTrue(all((target / skill).is_dir() for skill in new_skills))
+            stages = [path for path in target.iterdir() if path.name.startswith(".procraft-stage-")]
+            self.assertEqual(1, len(stages))
+            self.assertTrue((stages[0] / "backup" / "building-prompt-packages").is_dir())
 
     def test_copytree_failure_cleans_partial_destination(self):
         with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
