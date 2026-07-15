@@ -1,4 +1,4 @@
 interface:
-  display_name: "Tool Agent Prompting"
+  display_name: "ProCraft · Agent"
   short_description: "Build safe prompts for tool-using agents"
-  default_prompt: "Use $prompting-tool-agents to design a high-quality prompt for this tool-using agent."
+  default_prompt: "In an active ProCraft workflow with a ready contract, use $prompting-tool-agents for this tool-using Agent prompt."

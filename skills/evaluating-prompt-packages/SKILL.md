@@ -1,6 +1,6 @@
 ---
 name: evaluating-prompt-packages
-description: Use when an in-progress PromptPackage needs representative cases, an executable provider-neutral fixture, repeated runtime tests, baseline comparison, promotion criteria, or an honest not-run result.
+description: Use only in an active ProCraft workflow after static review when a PromptPackage needs representative cases, provider-neutral fixtures, runtime tests, baseline comparison, promotion criteria, or dynamic evaluation status.
 ---
 
 # Evaluating Prompt Packages

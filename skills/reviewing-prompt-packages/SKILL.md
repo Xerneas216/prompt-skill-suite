@@ -1,6 +1,6 @@
 ---
 name: reviewing-prompt-packages
-description: Use when an in-progress PromptPackage needs semantic static review for duplication, contradiction, overconstraint, missing requirements, invalid tool references, unsupported claims, or minimal repair before evaluation or delivery.
+description: Use only in an active ProCraft workflow when a candidate PromptPackage needs semantic static review for duplication, contradiction, overconstraint, missing requirements, invalid tool references, unsupported claims, or minimal repair.
 ---
 
 # Reviewing Prompt Packages

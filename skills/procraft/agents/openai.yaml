@@ -1,0 +1,4 @@
+interface:
+  display_name: "ProCraft"
+  short_description: "Craft reliable prompts and prompt packages"
+  default_prompt: "Use $procraft to create or improve the Prompt requested here."

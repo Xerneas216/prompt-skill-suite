@@ -1,6 +1,6 @@
 ---
 name: prompting-tool-agents
-description: Use when an in-progress PromptPackage has a ready contract involving tool selection, retrieval, citations, side effects, approvals, long-running work, programmatic tool calling, or tool failure recovery.
+description: Use only in an active ProCraft workflow when a ready contract needs tool or Agent prompt rules for selection, retrieval, citations, side effects, approvals, long-running work, programmatic tool calling, or failure recovery.
 ---
 
 # Prompting Tool Agents

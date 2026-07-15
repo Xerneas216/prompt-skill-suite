@@ -1,6 +1,6 @@
 ---
 name: defining-prompt-contracts
-description: Use when an in-progress PromptPackage needs incomplete, ambiguous, or conflicting requirements normalized into explicit goals, success criteria, evidence, permissions, output requirements, model settings, and stop conditions.
+description: Use only in an active ProCraft workflow when a complete, incomplete, ambiguous, or conflicting brief must be normalized or checked as a prompt contract before candidate messages are drafted.
 ---
 
 # Defining Prompt Contracts

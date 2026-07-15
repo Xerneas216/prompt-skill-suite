@@ -1,6 +1,6 @@
 ---
 name: prompting-software-engineering
-description: Use when an in-progress PromptPackage has a ready contract for software explanation, diagnosis, implementation, bug fixing, refactoring, code review, testing, architecture planning, frontend changes, or visual verification.
+description: Use only in an active ProCraft workflow when a ready contract needs software prompt rules for explanation, diagnosis, implementation, bug fixing, refactoring, code review, testing, architecture, frontend changes, or visual verification.
 ---
 
 # Prompting Software Engineering

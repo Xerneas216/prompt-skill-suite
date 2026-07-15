@@ -1,4 +1,0 @@
-interface:
-  display_name: "Prompt Package Builder"
-  short_description: "Build validated prompt packages from requests"
-  default_prompt: "Use $building-prompt-packages to turn this request into a reviewed and evaluable PromptPackage."

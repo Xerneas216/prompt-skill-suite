@@ -419,6 +419,7 @@
           "uniqueItems": true,
           "items": {
             "enum": [
+              "procraft",
               "building-prompt-packages",
               "defining-prompt-contracts",
               "prompting-general-tasks",

@@ -1,4 +1,4 @@
 interface:
-  display_name: "General Task Prompting"
+  display_name: "ProCraft · General"
   short_description: "Build faithful prompts for general tasks"
-  default_prompt: "Use $prompting-general-tasks to design a high-quality prompt for this general task."
+  default_prompt: "In an active ProCraft workflow with a ready contract, use $prompting-general-tasks for this general-task prompt."

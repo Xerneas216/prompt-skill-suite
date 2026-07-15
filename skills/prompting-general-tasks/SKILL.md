@@ -1,6 +1,6 @@
 ---
 name: prompting-general-tasks
-description: Use when an in-progress PromptPackage has a ready contract for question answering, grounded research, analysis, writing, rewriting, summarization, extraction, classification, or other non-software behavior.
+description: Use only in an active ProCraft workflow when a ready contract needs general-task prompt rules for question answering, research, analysis, writing, rewriting, summarization, extraction, or classification.
 ---
 
 # Prompting General Tasks
