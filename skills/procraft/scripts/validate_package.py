@@ -16,7 +16,6 @@ from jsonschema.exceptions import SchemaError
 
 SCHEMA_PATH = Path(__file__).resolve().parents[1] / "references" / "prompt-package.schema.json"
 CANONICAL_ENTRY_MODULE = "procraft"
-LEGACY_ENTRY_MODULE = "building-prompt-packages"
 REQUIRED_CORE_MODULES = {
     CANONICAL_ENTRY_MODULE,
     "defining-prompt-contracts",
@@ -126,18 +125,14 @@ def _semantic_errors(package: dict[str, Any]) -> list[str]:
         errors.append("model_profile.reasoning_context all_turns is invalid for single_turn")
 
     modules = set(package.get("provenance", {}).get("participating_modules", []))
-    normalized_modules = {
-        CANONICAL_ENTRY_MODULE if module == LEGACY_ENTRY_MODULE else module
-        for module in modules
-    }
-    missing_core = sorted(REQUIRED_CORE_MODULES - normalized_modules)
+    missing_core = sorted(REQUIRED_CORE_MODULES - modules)
     if missing_core:
         errors.append(f"provenance.participating_modules missing core modules: {', '.join(missing_core)}")
     scenario = request.get("scenario")
     specialist = SPECIALIST_BY_SCENARIO.get(scenario)
-    if specialist and specialist not in normalized_modules:
+    if specialist and specialist not in modules:
         errors.append(f"provenance.participating_modules missing {specialist} for {scenario}")
-    if request.get("uses_tools") and "prompting-tool-agents" not in normalized_modules:
+    if request.get("uses_tools") and "prompting-tool-agents" not in modules:
         errors.append("provenance.participating_modules missing prompting-tool-agents for tool use")
     if scenario == "hybrid":
         specialists = {
@@ -145,7 +140,7 @@ def _semantic_errors(package: dict[str, Any]) -> list[str]:
             "prompting-tool-agents",
             "prompting-software-engineering",
         }
-        if len(normalized_modules & specialists) < 2:
+        if len(modules & specialists) < 2:
             errors.append("hybrid scenario requires at least two specialist modules")
 
     tool_policy = package.get("tool_policy")

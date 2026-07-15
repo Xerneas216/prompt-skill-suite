@@ -1,5 +1,4 @@
 import hashlib
-import json
 import os
 import subprocess
 import sys
@@ -14,11 +13,9 @@ sys.path.insert(0, str(ROOT / "tools"))
 from install_skills import InstallerError, install_skills  # noqa: E402
 
 
-LEGACY_MANIFEST_NAME = ".prompt-skill-suite-manifest.json"
 PROCRAFT_MANIFEST_NAME = ".procraft-manifest.json"
-KNOWN_LEGACY_MANIFEST = ROOT / "tools" / "legacy-v0.1.0-manifest.json"
-KNOWN_WINDOWS_LEGACY_MANIFEST = ROOT / "tools" / "legacy-v0.1.0-windows-manifest.json"
-INTERNAL_SKILLS = [
+PROCRAFT_SKILLS = [
+    "procraft",
     "defining-prompt-contracts",
     "prompting-general-tasks",
     "prompting-tool-agents",
@@ -35,139 +32,18 @@ def write_skill(root, name, body):
     (skill / "agents" / "openai.yaml").write_text("interface: {}\n", encoding="utf-8")
 
 
-def file_hashes(root, skill_names):
-    files = {}
-    for skill_name in skill_names:
-        for path in sorted((root / skill_name).rglob("*")):
-            if path.is_file():
-                relative = (Path(skill_name) / path.relative_to(root / skill_name)).as_posix()
-                files[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
-    return files
-
-
-def write_json(path, value):
-    path.write_text(
-        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-
-
-def write_suite(root, entry_name, marker):
-    names = [entry_name, *INTERNAL_SKILLS]
-    for name in names:
-        write_skill(root, name, f"{marker}:{name}")
-    return names
-
-
-def write_legacy_install(target):
-    # Preserve the alphabetical order emitted by the v0.1.0 installer.
-    skill_names = sorted(write_suite(target, "building-prompt-packages", "legacy-v0.1.0"))
-    manifest = {
-        "manifest_version": "1.0",
-        "source": "known-v0.1.0-release",
-        "skills": skill_names,
-        "files": file_hashes(target, skill_names),
-    }
-    write_json(target / LEGACY_MANIFEST_NAME, manifest)
-    return manifest
-
-
-def tree_snapshot(root):
-    return {
-        "directories": sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_dir()),
-        "files": {
-            path.relative_to(root).as_posix(): path.read_bytes()
-            for path in sorted(root.rglob("*"))
-            if path.is_file()
-        },
-    }
-
-
-def v0_1_0_installed_blobs():
-    release_files = subprocess.run(
-        ["git", "ls-tree", "-r", "--name-only", "v0.1.0", "--", "skills"],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.splitlines()
-    skill_names = sorted(["building-prompt-packages", *INTERNAL_SKILLS])
-    return skill_names, {
-        relative.removeprefix("skills/"): subprocess.run(
-            ["git", "show", f"v0.1.0:{relative}"],
-            cwd=ROOT,
-            check=True,
-            capture_output=True,
-        ).stdout
-        for relative in release_files
-        if relative.split("/", 2)[1] in skill_names
-    }
-
-
-def write_v0_1_0_release_install(target, windows_crlf_yaml=False):
-    skill_names, release_blobs = v0_1_0_installed_blobs()
-    for relative, blob in release_blobs.items():
-        destination = target / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        if windows_crlf_yaml and relative.endswith("/agents/openai.yaml"):
-            blob = blob.replace(b"\n", b"\r\n")
-        destination.write_bytes(blob)
-    manifest = {
-        "files": file_hashes(target, skill_names),
-        "manifest_version": "1.0",
-        "skills": skill_names,
-        "source": "D:\\Codex\\Common\\prompt-skill-suite\\skills",
-    }
-    write_json(target / LEGACY_MANIFEST_NAME, manifest)
-    return manifest
-
-
 class InstallSkillsTests(unittest.TestCase):
-    def test_v0_1_0_installed_skill_variants_are_derived_from_the_tag(self):
-        # The v0.1.0 installer sorted directories and never published skills/.gitkeep.
-        release_skill_names, release_blobs = v0_1_0_installed_blobs()
-        release_hashes = {
-            relative: hashlib.sha256(blob).hexdigest()
-            for relative, blob in release_blobs.items()
-        }
-        windows_hashes = {
-            relative: hashlib.sha256(
-                blob.replace(b"\n", b"\r\n")
-                if relative.endswith("/agents/openai.yaml")
-                else blob
-            ).hexdigest()
-            for relative, blob in release_blobs.items()
-        }
-        expected_variants = [
-            (KNOWN_LEGACY_MANIFEST, "git-tag", release_hashes),
-            (KNOWN_WINDOWS_LEGACY_MANIFEST, "windows-crlf-yaml", windows_hashes),
-        ]
-        for path, variant, expected_hashes in expected_variants:
-            with self.subTest(variant=variant):
-                if not path.is_file():
-                    self.fail(f"{path.relative_to(ROOT).as_posix()} must be committed")
-                manifest = json.loads(path.read_text(encoding="utf-8"))
-                self.assertEqual("v0.1.0", manifest.get("release"))
-                self.assertEqual(variant, manifest.get("variant"))
-                self.assertEqual("1.0", manifest.get("manifest_version"))
-                self.assertEqual(release_skill_names, manifest.get("skills"))
-                self.assertEqual(expected_hashes, manifest.get("files"))
+    def test_installer_source_has_no_retired_migration_surface(self):
+        source = (ROOT / "tools" / "install_skills.py").read_text(encoding="utf-8")
+        retired_markers = (
+            "legacy" + "_migration",
+            "legacy-" + "v0." + "1.0",
+            ".prompt" + "-skill-suite-manifest.json",
+        )
 
-    def test_default_loader_migrates_both_v0_1_0_install_variants(self):
-        for variant, windows_crlf_yaml in [("git-tag", False), ("windows-crlf-yaml", True)]:
-            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
-                source = Path(source_dir)
-                target = Path(target_dir)
-                new_skills = write_suite(source, "procraft", "v0.2.0")
-                write_v0_1_0_release_install(target, windows_crlf_yaml=windows_crlf_yaml)
-
-                result = install_skills(source, target)
-
-                self.assertEqual("legacy_migration", result["mode"])
-                self.assertEqual(new_skills, result["skills"])
-                self.assertTrue((target / PROCRAFT_MANIFEST_NAME).is_file())
-                self.assertFalse((target / LEGACY_MANIFEST_NAME).exists())
-                self.assertFalse((target / "building-prompt-packages").exists())
+        for marker in retired_markers:
+            with self.subTest(marker=marker):
+                self.assertNotIn(marker, source)
 
     def test_root_cli_dry_run_does_not_write(self):
         with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
@@ -197,230 +73,72 @@ class InstallSkillsTests(unittest.TestCase):
             target = Path(target_dir)
             write_skill(source, "one", "one")
             result = install_skills(source, target, dry_run=True)
-            self.assertEqual("clean_install", result.get("mode"))
+            self.assertEqual("clean_install", result["mode"])
             self.assertEqual(["one"], result["skills"])
             self.assertEqual([], list(target.iterdir()))
 
-    def test_default_refuses_name_conflict_before_copy(self):
+    def test_complete_suite_keeps_procraft_first(self):
+        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
+            source = Path(source_dir)
+            target = Path(target_dir)
+            for name in reversed(PROCRAFT_SKILLS):
+                write_skill(source, name, name)
+
+            result = install_skills(source, target, dry_run=True)
+
+            self.assertEqual(PROCRAFT_SKILLS, result["skills"])
+
+    def test_missing_metadata_is_rejected(self):
+        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
+            source = Path(source_dir)
+            target = Path(target_dir)
+            skill = source / "one"
+            skill.mkdir()
+            (skill / "SKILL.md").write_text("one", encoding="utf-8")
+
+            with self.assertRaisesRegex(InstallerError, "Missing agents/openai.yaml"):
+                install_skills(source, target)
+
+    def test_name_conflict_is_rejected_before_copy(self):
         with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
             source = Path(source_dir)
             target = Path(target_dir)
             write_skill(source, "one", "new")
             write_skill(source, "two", "two")
             write_skill(target, "one", "existing")
+
             with self.assertRaises(InstallerError):
                 install_skills(source, target)
+
             self.assertFalse((target / "two").exists())
+
+    def test_existing_manifest_is_rejected_before_copy(self):
+        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
+            source = Path(source_dir)
+            target = Path(target_dir)
+            write_skill(source, "one", "one")
+            (target / PROCRAFT_MANIFEST_NAME).write_text("{}\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(InstallerError, "existing manifest"):
+                install_skills(source, target)
+
+            self.assertFalse((target / "one").exists())
 
     def test_copy_and_manifest_hashes_match(self):
         with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
             source = Path(source_dir)
             target = Path(target_dir)
             write_skill(source, "one", "one")
+
             result = install_skills(source, target)
+
             copied = target / "one" / "SKILL.md"
             expected = hashlib.sha256(copied.read_bytes()).hexdigest()
             self.assertEqual(expected, result["files"]["one/SKILL.md"])
-            self.assertEqual("clean_install", result.get("mode"))
+            self.assertEqual("clean_install", result["mode"])
             self.assertTrue((target / PROCRAFT_MANIFEST_NAME).is_file())
-            self.assertFalse((target / LEGACY_MANIFEST_NAME).exists())
 
-    def test_matching_known_legacy_install_migrates_atomically(self):
-        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
-            source = Path(source_dir)
-            target = Path(target_dir)
-            new_skills = write_suite(source, "procraft", "v0.2.0")
-            legacy_manifest = write_legacy_install(target)
-            installed_manifest = dict(legacy_manifest)
-            installed_manifest["source"] = "E:\\a-different-checkout\\skills"
-            write_json(target / LEGACY_MANIFEST_NAME, installed_manifest)
-
-            with patch(
-                "install_skills._load_known_legacy_manifests",
-                return_value=[legacy_manifest],
-                create=True,
-            ):
-                try:
-                    dry_run = install_skills(source, target, dry_run=True)
-                except InstallerError as exc:
-                    self.fail(f"a fully matching trusted legacy install must support dry-run: {exc}")
-            self.assertEqual("legacy_migration", dry_run["mode"])
-            self.assertTrue((target / "building-prompt-packages").is_dir())
-            self.assertFalse((target / "procraft").exists())
-
-            with patch(
-                "install_skills._load_known_legacy_manifests",
-                return_value=[legacy_manifest],
-                create=True,
-            ):
-                try:
-                    result = install_skills(source, target)
-                except InstallerError as exc:
-                    self.fail(f"a fully matching trusted legacy install must migrate: {exc}")
-
-            self.assertEqual("legacy_migration", result["mode"])
-            self.assertEqual(new_skills, result["skills"])
-            self.assertFalse((target / "building-prompt-packages").exists())
-            self.assertFalse((target / LEGACY_MANIFEST_NAME).exists())
-            self.assertTrue((target / PROCRAFT_MANIFEST_NAME).is_file())
-            for skill_name in new_skills:
-                self.assertEqual(
-                    f"v0.2.0:{skill_name}",
-                    (target / skill_name / "SKILL.md").read_text(encoding="utf-8"),
-                )
-
-    def test_changed_legacy_install_is_rejected_without_any_write(self):
-        mutations = {
-            "modified": lambda target: (target / "defining-prompt-contracts" / "SKILL.md").write_text(
-                "user modification", encoding="utf-8"
-            ),
-            "extra": lambda target: (target / "defining-prompt-contracts" / "extra.txt").write_text(
-                "external", encoding="utf-8"
-            ),
-            "missing": lambda target: (target / "defining-prompt-contracts" / "SKILL.md").unlink(),
-        }
-        for case, mutate in mutations.items():
-            with self.subTest(case=case), tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
-                source = Path(source_dir)
-                target = Path(target_dir)
-                write_suite(source, "procraft", "v0.2.0")
-                legacy_manifest = write_legacy_install(target)
-                mutate(target)
-                before = tree_snapshot(target)
-
-                with patch(
-                    "install_skills._load_known_legacy_manifests",
-                    return_value=[legacy_manifest],
-                    create=True,
-                ):
-                    with self.assertRaises(InstallerError):
-                        install_skills(source, target)
-
-                self.assertEqual(before, tree_snapshot(target))
-
-    def test_legacy_manifest_shape_version_and_source_are_strict(self):
-        mutations = {
-            "extra_field": lambda manifest: manifest.update({"release": "v0.1.0"}),
-            "missing_source": lambda manifest: manifest.pop("source"),
-            "wrong_version": lambda manifest: manifest.update({"manifest_version": "2.0"}),
-            "empty_source": lambda manifest: manifest.update({"source": ""}),
-            "non_string_source": lambda manifest: manifest.update({"source": 7}),
-        }
-        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
-            source = Path(source_dir)
-            target = Path(target_dir)
-            write_suite(source, "procraft", "v0.2.0")
-            trusted_manifest = write_legacy_install(target)
-            for case, mutate in mutations.items():
-                installed_manifest = dict(trusted_manifest)
-                mutate(installed_manifest)
-                write_json(target / LEGACY_MANIFEST_NAME, installed_manifest)
-                before = tree_snapshot(target)
-
-                with self.subTest(case=case), patch(
-                    "install_skills._load_known_legacy_manifests",
-                    return_value=[trusted_manifest],
-                ):
-                    with self.assertRaises(InstallerError):
-                        install_skills(source, target)
-
-                self.assertEqual(before, tree_snapshot(target))
-
-    def test_migration_publish_failure_restores_the_complete_legacy_install(self):
-        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
-            source = Path(source_dir)
-            target = Path(target_dir)
-            write_suite(source, "procraft", "v0.2.0")
-            legacy_manifest = write_legacy_install(target)
-            before = tree_snapshot(target)
-
-            with patch(
-                "install_skills._load_known_legacy_manifests",
-                return_value=[legacy_manifest],
-                create=True,
-            ), patch(
-                "install_skills.os.link",
-                side_effect=OSError("simulated manifest publish failure"),
-            ) as publish_manifest:
-                with self.assertRaises((OSError, InstallerError)):
-                    install_skills(source, target)
-
-            self.assertTrue(
-                publish_manifest.called,
-                "the failure must occur during new-manifest publication, after migration starts",
-            )
-            self.assertEqual(before, tree_snapshot(target))
-
-    def test_migration_race_preserves_foreign_content_and_restores_legacy(self):
-        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
-            source = Path(source_dir)
-            target = Path(target_dir).resolve()
-            write_suite(source, "procraft", "v0.2.0")
-            legacy_manifest = write_legacy_install(target)
-            legacy_snapshot = tree_snapshot(target)
-            original_rename = os.rename
-
-            def race_on_procraft_publish(staged, destination):
-                destination = Path(destination)
-                if destination == target / "procraft":
-                    destination.mkdir(parents=True)
-                    (destination / "foreign.txt").write_text("foreign", encoding="utf-8")
-                    raise FileExistsError("simulated concurrent ProCraft install")
-                return original_rename(staged, destination)
-
-            with patch(
-                "install_skills._load_known_legacy_manifests",
-                return_value=[legacy_manifest],
-                create=True,
-            ), patch("install_skills.os.rename", side_effect=race_on_procraft_publish):
-                with self.assertRaises((InstallerError, FileExistsError)):
-                    install_skills(source, target)
-
-            foreign = target / "procraft" / "foreign.txt"
-            self.assertTrue(foreign.is_file(), "concurrent foreign content must survive rollback")
-            self.assertEqual("foreign", foreign.read_text(encoding="utf-8"))
-            after = tree_snapshot(target)
-            after["files"].pop("procraft/foreign.txt")
-            after["directories"].remove("procraft")
-            self.assertEqual(legacy_snapshot, after)
-            self.assertFalse((target / PROCRAFT_MANIFEST_NAME).exists())
-            leaked_stages = [
-                path.name
-                for path in target.iterdir()
-                if path.is_dir() and "stage" in path.name.casefold()
-            ]
-            self.assertEqual([], leaked_stages)
-
-    def test_cleanup_failure_reports_published_migration_without_rolling_it_back(self):
-        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
-            source = Path(source_dir)
-            target = Path(target_dir)
-            new_skills = write_suite(source, "procraft", "v0.2.0")
-            legacy_manifest = write_legacy_install(target)
-
-            with patch(
-                "install_skills._load_known_legacy_manifests",
-                return_value=[legacy_manifest],
-            ), patch(
-                "install_skills._cleanup_staging_root",
-                side_effect=OSError("simulated cleanup failure"),
-            ) as cleanup:
-                with self.assertRaisesRegex(
-                    InstallerError,
-                    "published and verified.*staging cleanup failed",
-                ):
-                    install_skills(source, target)
-
-            cleanup.assert_called_once()
-            self.assertTrue((target / PROCRAFT_MANIFEST_NAME).is_file())
-            self.assertFalse((target / LEGACY_MANIFEST_NAME).exists())
-            self.assertFalse((target / "building-prompt-packages").exists())
-            self.assertTrue(all((target / skill).is_dir() for skill in new_skills))
-            stages = [path for path in target.iterdir() if path.name.startswith(".procraft-stage-")]
-            self.assertEqual(1, len(stages))
-            self.assertTrue((stages[0] / "backup" / "building-prompt-packages").is_dir())
-
-    def test_copytree_failure_cleans_partial_destination(self):
+    def test_copy_failure_cleans_partial_destination(self):
         with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
             source = Path(source_dir)
             target = Path(target_dir)
@@ -434,16 +152,19 @@ class InstallSkillsTests(unittest.TestCase):
             with patch("install_skills.shutil.copy2", side_effect=partial_copy):
                 with self.assertRaises(OSError):
                     install_skills(source, target)
+
             self.assertEqual([], list(target.iterdir()))
 
-    def test_manifest_replace_failure_cleans_skills_and_temp_manifest(self):
+    def test_manifest_publish_failure_cleans_skills_and_staging(self):
         with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
             source = Path(source_dir)
             target = Path(target_dir)
             write_skill(source, "one", "one")
-            with patch("install_skills.os.link", side_effect=OSError("simulated manifest publish failure")):
+
+            with patch("install_skills.os.link", side_effect=OSError("simulated publish failure")):
                 with self.assertRaises(OSError):
                     install_skills(source, target)
+
             self.assertEqual([], list(target.iterdir()))
 
     def test_publish_race_does_not_delete_foreign_directory(self):
@@ -460,7 +181,30 @@ class InstallSkillsTests(unittest.TestCase):
             with patch("install_skills.os.rename", side_effect=race_publish):
                 with self.assertRaises(FileExistsError):
                     install_skills(source, target)
+
             self.assertEqual("foreign", (target / "one" / "foreign.txt").read_text(encoding="utf-8"))
+
+    def test_cleanup_failure_reports_published_install(self):
+        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
+            source = Path(source_dir)
+            target = Path(target_dir)
+            write_skill(source, "one", "one")
+
+            with patch(
+                "install_skills._cleanup_staging_root",
+                side_effect=OSError("simulated cleanup failure"),
+            ) as cleanup:
+                with self.assertRaisesRegex(
+                    InstallerError,
+                    "published and verified.*staging cleanup failed",
+                ):
+                    install_skills(source, target)
+
+            cleanup.assert_called_once()
+            self.assertTrue((target / "one").is_dir())
+            self.assertTrue((target / PROCRAFT_MANIFEST_NAME).is_file())
+            stages = [path for path in target.iterdir() if path.name.startswith(".procraft-stage-")]
+            self.assertEqual(1, len(stages))
 
     def test_unlisted_cache_files_are_not_copied(self):
         with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
@@ -470,7 +214,9 @@ class InstallSkillsTests(unittest.TestCase):
             cache = source / "one" / "__pycache__"
             cache.mkdir()
             (cache / "module.pyc").write_bytes(b"cache")
+
             result = install_skills(source, target)
+
             self.assertNotIn("one/__pycache__/module.pyc", result["files"])
             self.assertFalse((target / "one" / "__pycache__").exists())
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -74,9 +75,7 @@ class PublicDocumentationTests(unittest.TestCase):
             self.assertIn("skills\\procraft\\scripts\\render_package.py", readme)
             self.assertIn("prompt-package.json", readme)
             self.assertIn("prompt-package.md", readme)
-            self.assertIn("v0.1.0", readme)
             self.assertIn("SHA-256", readme)
-            self.assertIn("legacy_migration", readme)
 
     def test_readmes_avoid_disclaimers_stale_paths_and_dash_tells(self) -> None:
         forbidden = re.compile(
@@ -85,21 +84,23 @@ class PublicDocumentationTests(unittest.TestCase):
         )
         for readme in (self.english, self.chinese):
             self.assertIsNone(forbidden.search(readme))
-            self.assertNotIn("building-prompt-packages", readme)
-            self.assertNotIn("prompt-skill-suite", readme)
-            self.assertNotIn(".prompt-skill-suite-manifest.json", readme)
+            self.assertNotIn("building" + "-prompt-packages", readme)
+            self.assertNotIn("prompt" + "-skill-suite", readme)
+            self.assertNotIn(".prompt" + "-skill-suite-manifest.json", readme)
             self.assertNotRegex(readme, "[—–]")
 
-    def test_procraft_baseline_replaces_the_old_result_name(self) -> None:
-        old_result = ROOT / "evals" / "results" / "building-prompt-packages-baseline.md"
+    def test_procraft_baseline_describes_only_the_current_gateway(self) -> None:
+        old_result = ROOT / "evals" / "results" / ("building" + "-prompt-packages-baseline.md")
         new_result = ROOT / "evals" / "results" / "procraft-baseline.md"
 
         self.assertFalse(old_result.exists())
         content = new_result.read_text(encoding="utf-8")
         self.assertTrue(content.startswith("# ProCraft baseline"))
-        self.assertIn("historical", content.lower())
-        self.assertIn("not_run", content)
-        self.assertNotIn("building-prompt-packages", content)
+        self.assertIn("0/5", content)
+        self.assertIn("5/5", content)
+        self.assertIn("1/1", content)
+        self.assertNotIn("historical", content.lower())
+        self.assertNotIn("v0." + "1.0", content)
 
     def test_active_public_artifacts_have_no_actionable_legacy_name(self) -> None:
         artifacts = [
@@ -111,21 +112,38 @@ class PublicDocumentationTests(unittest.TestCase):
         for artifact in artifacts:
             content = artifact.read_text(encoding="utf-8")
             with self.subTest(artifact=artifact.relative_to(ROOT).as_posix()):
-                self.assertNotIn("building-prompt-packages", content)
-                self.assertNotIn("prompt-skill-suite", content)
+                self.assertNotIn("building" + "-prompt-packages", content)
+                self.assertNotIn("prompt" + "-skill-suite", content)
 
-    def test_stale_design_records_open_with_a_do_not_execute_notice(self) -> None:
-        records = sorted((ROOT / "docs" / "superpowers").rglob("*.md"))
-        self.assertTrue(records)
-        for record in records:
-            content = record.read_text(encoding="utf-8")
-            if "prompt-skill-suite" not in content and "building-prompt-packages" not in content:
+    def test_repository_has_no_retired_public_surface(self) -> None:
+        self.assertEqual([], list((ROOT / "docs" / "superpowers").rglob("*.md")))
+        self.assertFalse((ROOT / "tools" / ("legacy-v0." + "1.0-manifest.json")).exists())
+        self.assertFalse((ROOT / "tools" / ("legacy-v0." + "1.0-windows-manifest.json")).exists())
+
+        retired_markers = (
+            "building" + "-prompt-packages",
+            "prompt" + "-skill-suite",
+            "v0." + "1.0",
+            "legacy" + "_migration",
+        )
+        text_suffixes = {".md", ".py", ".json", ".yaml", ".yml", ".txt"}
+        tracked = subprocess.run(
+            ["git", "ls-files"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.splitlines()
+        for relative in tracked:
+            path = ROOT / relative
+            if not path.is_file():
                 continue
-            notice = content[:600].lower()
-            with self.subTest(record=record.name):
-                self.assertIn("historical record", notice)
-                self.assertIn("do not execute", notice)
-                self.assertIn("readme", notice)
+            if path.suffix not in text_suffixes and path.name not in {".gitignore"}:
+                continue
+            content = path.read_text(encoding="utf-8")
+            for marker in retired_markers:
+                with self.subTest(path=path.relative_to(ROOT).as_posix(), marker=marker):
+                    self.assertNotIn(marker, content)
 
 
 if __name__ == "__main__":

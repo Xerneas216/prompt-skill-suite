@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install verified ProCraft skills with conflict detection and safe migration."""
+"""Install verified ProCraft skills with conflict detection and rollback."""
 
 from __future__ import annotations
 
@@ -10,12 +10,10 @@ import os
 import shutil
 import sys
 import tempfile
-from pathlib import Path, PurePosixPath
-from typing import Any
+from pathlib import Path
 
 
 MANIFEST_NAME = ".procraft-manifest.json"
-LEGACY_MANIFEST_NAME = ".prompt-skill-suite-manifest.json"
 STAGING_PREFIX = ".procraft-stage-"
 PROCRAFT_SKILLS = [
     "procraft",
@@ -26,11 +24,6 @@ PROCRAFT_SKILLS = [
     "reviewing-prompt-packages",
     "evaluating-prompt-packages",
 ]
-KNOWN_LEGACY_MANIFEST_PATHS = [
-    Path(__file__).with_name("legacy-v0.1.0-manifest.json"),
-    Path(__file__).with_name("legacy-v0.1.0-windows-manifest.json"),
-]
-LEGACY_MANIFEST_KEYS = {"files", "manifest_version", "skills", "source"}
 
 
 class InstallerError(RuntimeError):
@@ -48,7 +41,6 @@ def _skill_dirs(source: Path) -> list[Path]:
         raise InstallerError("Missing agents/openai.yaml: " + ", ".join(missing_metadata))
     by_name = {path.name: path for path in skills}
     if set(by_name) == set(PROCRAFT_SKILLS):
-        # ProCraft v0.2 uses an entry-first public ordering; v0.1 used alphabetical discovery.
         return [by_name[name] for name in PROCRAFT_SKILLS]
     return skills
 
@@ -104,122 +96,7 @@ def _tree_matches_manifest(
         return False
 
 
-def _tree_fingerprint(root: Path, skill_names: list[str]) -> dict[str, tuple[int, int, int, int, int]]:
-    fingerprint: dict[str, tuple[int, int, int, int, int]] = {}
-    for skill_name in skill_names:
-        skill_root = root / skill_name
-        for path in [skill_root, *sorted(skill_root.rglob("*"))]:
-            stat = path.stat()
-            relative = path.relative_to(root).as_posix()
-            fingerprint[relative] = (
-                stat.st_dev,
-                stat.st_ino,
-                stat.st_mode,
-                stat.st_size,
-                stat.st_mtime_ns,
-            )
-    return fingerprint
-
-
-def _validate_manifest_shape(manifest: Any, label: str) -> tuple[list[str], dict[str, str]]:
-    if not isinstance(manifest, dict):
-        raise InstallerError(f"{label} must contain a JSON object")
-    skills = manifest.get("skills")
-    files = manifest.get("files")
-    if (
-        not isinstance(skills, list)
-        or not skills
-        or any(not isinstance(name, str) or not name or Path(name).name != name for name in skills)
-        or len(skills) != len(set(skills))
-    ):
-        raise InstallerError(f"{label} has an invalid skills list")
-    if not isinstance(files, dict) or not files:
-        raise InstallerError(f"{label} has an invalid files map")
-    for relative, digest in files.items():
-        if not isinstance(relative, str) or not isinstance(digest, str):
-            raise InstallerError(f"{label} has a non-string file entry")
-        path = PurePosixPath(relative)
-        if (
-            path.is_absolute()
-            or not path.parts
-            or path.parts[0] not in skills
-            or any(part in {"", ".", ".."} for part in path.parts)
-            or len(digest) != 64
-            or any(character not in "0123456789abcdef" for character in digest)
-        ):
-            raise InstallerError(f"{label} has an invalid file entry: {relative}")
-    return skills, files
-
-
-def _validate_installed_legacy_manifest(manifest: dict[str, Any]) -> tuple[list[str], dict[str, str]]:
-    if set(manifest) != LEGACY_MANIFEST_KEYS:
-        raise InstallerError("Legacy manifest must contain exactly files, manifest_version, skills, and source")
-    if manifest.get("manifest_version") != "1.0":
-        raise InstallerError("Legacy manifest_version must be 1.0")
-    source = manifest.get("source")
-    if not isinstance(source, str) or not source.strip():
-        raise InstallerError("Legacy manifest source must be a non-empty string")
-    return _validate_manifest_shape(manifest, "Legacy manifest")
-
-
-def _load_known_legacy_manifests() -> list[dict[str, Any]]:
-    """Load committed trust anchors; callers cannot supply migration trust."""
-    manifests: list[dict[str, Any]] = []
-    for path in KNOWN_LEGACY_MANIFEST_PATHS:
-        try:
-            manifest = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise InstallerError(f"Cannot load legacy trust anchor: {path}") from exc
-        _validate_manifest_shape(manifest, "Legacy trust anchor")
-        manifests.append(manifest)
-    return manifests
-
-
-def _read_json(path: Path, label: str) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise InstallerError(f"Cannot read {label}: {path}") from exc
-    if not isinstance(value, dict):
-        raise InstallerError(f"{label} must contain a JSON object")
-    return value
-
-
-def _trusted_legacy_state(target: Path, legacy_manifest_path: Path) -> dict[str, Any]:
-    installed = _read_json(legacy_manifest_path, "legacy manifest")
-    installed_skills, installed_files = _validate_installed_legacy_manifest(installed)
-    trusted: dict[str, Any] | None = None
-    for candidate in _load_known_legacy_manifests():
-        candidate_skills, candidate_files = _validate_manifest_shape(candidate, "Legacy trust anchor")
-        if installed_skills == candidate_skills and installed_files == candidate_files:
-            trusted = candidate
-            break
-    if trusted is None:
-        raise InstallerError("Legacy manifest does not match a committed trust anchor")
-    if not _tree_matches_manifest(target, installed_skills, installed_files):
-        raise InstallerError("Legacy skill files are missing, modified, or contain untracked content")
-    return {
-        "skills": installed_skills,
-        "files": installed_files,
-        "manifest_bytes": legacy_manifest_path.read_bytes(),
-        "manifest_identity": _identity(legacy_manifest_path),
-        "tree_fingerprint": _tree_fingerprint(target, installed_skills),
-    }
-
-
-def _legacy_state_is_current(target: Path, legacy_manifest_path: Path, state: dict[str, Any]) -> bool:
-    try:
-        return (
-            legacy_manifest_path.read_bytes() == state["manifest_bytes"]
-            and _identity(legacy_manifest_path) == state["manifest_identity"]
-            and _tree_fingerprint(target, state["skills"]) == state["tree_fingerprint"]
-            and _tree_matches_manifest(target, state["skills"], state["files"])
-        )
-    except OSError:
-        return False
-
-
-def _write_manifest(path: Path, manifest: dict[str, Any]) -> None:
+def _write_manifest(path: Path, manifest: dict) -> None:
     with path.open("x", encoding="utf-8", newline="\n") as handle:
         json.dump(manifest, handle, ensure_ascii=False, indent=2, sort_keys=True)
         handle.write("\n")
@@ -263,37 +140,6 @@ def _remove_matching_skills(
     return errors
 
 
-def _restore_legacy_backup(
-    target: Path,
-    backup_root: Path,
-    legacy_skill_names: list[str],
-    legacy_manifest_path: Path,
-) -> list[str]:
-    errors: list[str] = []
-    for skill_name in legacy_skill_names:
-        backup = backup_root / skill_name
-        if not backup.exists():
-            continue
-        destination = target / skill_name
-        if destination.exists():
-            errors.append(f"cannot restore {skill_name}: destination appeared")
-            continue
-        try:
-            os.rename(backup, destination)
-        except OSError as exc:
-            errors.append(f"cannot restore {skill_name}: {exc}")
-    backup_manifest = backup_root / LEGACY_MANIFEST_NAME
-    if backup_manifest.exists():
-        if legacy_manifest_path.exists():
-            errors.append("cannot restore legacy manifest: destination appeared")
-        else:
-            try:
-                os.rename(backup_manifest, legacy_manifest_path)
-            except OSError as exc:
-                errors.append(f"cannot restore legacy manifest: {exc}")
-    return errors
-
-
 def _cleanup_staging_root(staging_root: Path) -> None:
     try:
         shutil.rmtree(staging_root)
@@ -301,8 +147,8 @@ def _cleanup_staging_root(staging_root: Path) -> None:
         return
 
 
-def install_skills(source: Path, target: Path, dry_run: bool = False) -> dict[str, Any]:
-    """Install discovered skills or migrate an exact trusted v0.1.0 installation."""
+def install_skills(source: Path, target: Path, dry_run: bool = False) -> dict:
+    """Install a new verified ProCraft suite without overwriting existing skills."""
     source = source.resolve()
     target = target.resolve()
     skills = _skill_dirs(source)
@@ -310,29 +156,16 @@ def install_skills(source: Path, target: Path, dry_run: bool = False) -> dict[st
     source_files = _source_files(skills)
     expected_hashes = {relative: _sha256(path) for relative, path in source_files}
     manifest_path = target / MANIFEST_NAME
-    legacy_manifest_path = target / LEGACY_MANIFEST_NAME
-    legacy_state: dict[str, Any] | None = None
 
     if manifest_path.exists():
         raise InstallerError(f"Refusing to overwrite existing manifest: {manifest_path}")
-    if legacy_manifest_path.exists():
-        if skill_names != PROCRAFT_SKILLS:
-            raise InstallerError("Legacy migration requires the complete seven-skill ProCraft source suite")
-        legacy_state = _trusted_legacy_state(target, legacy_manifest_path)
-        allowed_conflicts = set(legacy_state["skills"])
-        conflicts = [name for name in skill_names if (target / name).exists() and name not in allowed_conflicts]
-        if conflicts:
-            raise InstallerError("Refusing to overwrite existing skills: " + ", ".join(conflicts))
-        mode = "legacy_migration"
-    else:
-        conflicts = [name for name in skill_names if (target / name).exists()]
-        if conflicts:
-            raise InstallerError("Refusing to overwrite existing skills: " + ", ".join(conflicts))
-        mode = "clean_install"
+    conflicts = [name for name in skill_names if (target / name).exists()]
+    if conflicts:
+        raise InstallerError("Refusing to overwrite existing skills: " + ", ".join(conflicts))
 
     manifest = {
         "manifest_version": "1.0",
-        "mode": mode,
+        "mode": "clean_install",
         "source": str(source),
         "skills": skill_names,
         "files": expected_hashes,
@@ -344,11 +177,9 @@ def install_skills(source: Path, target: Path, dry_run: bool = False) -> dict[st
     staging_root = Path(tempfile.mkdtemp(dir=target, prefix=STAGING_PREFIX))
     staged_new_root = staging_root / "new"
     staged_manifest = staged_new_root / MANIFEST_NAME
-    backup_root = staging_root / "backup"
     published: list[tuple[Path, tuple[int, int]]] = []
     manifest_identity: tuple[int, int] | None = None
     manifest_bytes = b""
-    migration_started = False
 
     try:
         staged_new_root.mkdir()
@@ -362,23 +193,10 @@ def install_skills(source: Path, target: Path, dry_run: bool = False) -> dict[st
         manifest_identity = _identity(staged_manifest)
         manifest_bytes = staged_manifest.read_bytes()
 
-        if mode == "legacy_migration":
-            assert legacy_state is not None
-            if manifest_path.exists() or (target / "procraft").exists():
-                raise InstallerError("Installation target changed during staging")
-            if not _legacy_state_is_current(target, legacy_manifest_path, legacy_state):
-                raise InstallerError("Legacy installation changed during staging")
-
-            backup_root.mkdir()
-            migration_started = True
-            for legacy_skill_name in legacy_state["skills"]:
-                os.rename(target / legacy_skill_name, backup_root / legacy_skill_name)
-            os.rename(legacy_manifest_path, backup_root / LEGACY_MANIFEST_NAME)
-        else:
-            concurrent_conflicts = [name for name in skill_names if (target / name).exists()]
-            if concurrent_conflicts or manifest_path.exists() or legacy_manifest_path.exists():
-                details = ", ".join(concurrent_conflicts) or str(manifest_path)
-                raise InstallerError(f"Installation target changed during staging: {details}")
+        concurrent_conflicts = [name for name in skill_names if (target / name).exists()]
+        if concurrent_conflicts or manifest_path.exists():
+            details = ", ".join(concurrent_conflicts) or str(manifest_path)
+            raise InstallerError(f"Installation target changed during staging: {details}")
 
         for skill_name in skill_names:
             destination = target / skill_name
@@ -396,10 +214,6 @@ def install_skills(source: Path, target: Path, dry_run: bool = False) -> dict[st
             or not _tree_matches_manifest(target, skill_names, expected_hashes)
         ):
             raise InstallerError("Published ProCraft installation failed final verification")
-        if mode == "legacy_migration" and (
-            legacy_manifest_path.exists() or (target / "building-prompt-packages").exists()
-        ):
-            raise InstallerError("Legacy entry or manifest remains after migration")
     except Exception as exc:
         rollback_errors: list[str] = []
         if manifest_identity is not None:
@@ -408,12 +222,6 @@ def install_skills(source: Path, target: Path, dry_run: bool = False) -> dict[st
             except OSError as rollback_exc:
                 rollback_errors.append(f"cannot remove new manifest: {rollback_exc}")
         rollback_errors.extend(_remove_matching_skills(target, published, expected_hashes))
-        if migration_started and legacy_state is not None:
-            rollback_errors.extend(
-                _restore_legacy_backup(target, backup_root, legacy_state["skills"], legacy_manifest_path)
-            )
-            if not rollback_errors and not _legacy_state_is_current(target, legacy_manifest_path, legacy_state):
-                rollback_errors.append("restored legacy installation failed verification")
         if rollback_errors:
             raise InstallerError(
                 f"Installation failed and rollback was incomplete: {'; '.join(rollback_errors)}"

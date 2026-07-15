@@ -61,12 +61,8 @@ class ProCraftSkillContractTests(unittest.TestCase):
             self.fail("skills/procraft/SKILL.md must exist as the canonical entry")
         return path.read_text(encoding="utf-8")
 
-    def test_procraft_replaces_the_legacy_entry_directory(self):
+    def test_procraft_is_the_public_entry_directory(self):
         self.assertTrue((SKILLS / "procraft" / "SKILL.md").is_file())
-        self.assertFalse(
-            (SKILLS / "building-prompt-packages").exists(),
-            "the legacy entry may be a compatibility identifier, not a current skill directory",
-        )
 
     def test_procraft_frontmatter_covers_positive_and_negative_trigger_boundaries(self):
         path = SKILLS / "procraft" / "SKILL.md"
@@ -101,7 +97,6 @@ class ProCraftSkillContractTests(unittest.TestCase):
         self.assertEqual("ProCraft", _yaml_value(path, "display_name"))
         default_prompt = _yaml_value(path, "default_prompt")
         self.assertIn("$procraft", default_prompt)
-        self.assertNotIn("$building-prompt-packages", default_prompt)
 
     def test_internal_skills_are_stage_gated_inside_the_procraft_workflow(self):
         for skill_name, (display_name, stage_terms) in INTERNAL_SKILLS.items():

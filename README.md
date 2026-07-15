@@ -113,7 +113,7 @@ Then install into `%USERPROFILE%\.codex\skills`:
 .\.venv\Scripts\python.exe install_skills.py
 ```
 
-A clean install refuses same-name conflicts. If it finds an untouched v0.1.0 installation, the installer can report `legacy_migration` and replace it safely. Migration proceeds only when the old manifest, every expected file, and every SHA-256 hash match the committed v0.1.0 trust anchors exactly. Missing, edited, extra, or concurrently changed content stops the migration before publication. Staging and rollback protect the old copy if publication fails.
+The installer is intentionally clean-install only. It refuses an existing ProCraft manifest or any same-name Skill directory, stages the new files, verifies their SHA-256 hashes, and rolls back unchanged files if publication fails.
 
 The installed state is recorded in `.procraft-manifest.json`. Start a new Codex task after installation so local Skill discovery refreshes.
 
