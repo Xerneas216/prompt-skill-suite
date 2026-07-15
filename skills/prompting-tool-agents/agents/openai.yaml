@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tool Agent Prompting"
+  short_description: "Build safe prompts for tool-using agents"
+  default_prompt: "Use $prompting-tool-agents to design a high-quality prompt for this tool-using agent."
