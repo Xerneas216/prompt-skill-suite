@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prompt Package Reviewer"
+  short_description: "Find and repair prompt package defects"
+  default_prompt: "Use $reviewing-prompt-packages to review this prompt package and propose minimal repairs."
