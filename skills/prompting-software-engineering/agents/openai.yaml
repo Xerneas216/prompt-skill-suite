@@ -1,0 +1,4 @@
+interface:
+  display_name: "Software Engineering Prompting"
+  short_description: "Build prompts for verified software work"
+  default_prompt: "Use $prompting-software-engineering to design a high-quality prompt for this software engineering task."
