@@ -17,7 +17,7 @@ INTERNAL_SKILLS = {
     "reviewing-prompt-packages": ("ProCraft · Review", ("candidate", "review")),
     "evaluating-prompt-packages": (
         "ProCraft · Evaluate",
-        ("review", "evaluation"),
+        ("passing static review", "evaluation"),
     ),
 }
 
