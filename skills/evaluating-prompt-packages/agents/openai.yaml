@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prompt Package Evaluator"
+  short_description: "Compare prompt candidates with evidence"
+  default_prompt: "Use $evaluating-prompt-packages to design or run a baseline comparison for this prompt package."
