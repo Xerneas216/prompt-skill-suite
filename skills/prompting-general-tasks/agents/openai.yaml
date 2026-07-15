@@ -1,0 +1,4 @@
+interface:
+  display_name: "General Task Prompting"
+  short_description: "Build faithful prompts for general tasks"
+  default_prompt: "Use $prompting-general-tasks to design a high-quality prompt for this general task."
