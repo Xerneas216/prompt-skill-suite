@@ -3,7 +3,9 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT_DIR = ROOT / "skills" / "building-prompt-packages" / "scripts"
+SCRIPT_DIR = ROOT / "skills" / "procraft" / "scripts"
+if not SCRIPT_DIR.is_dir():
+    SCRIPT_DIR = ROOT / "skills" / "building-prompt-packages" / "scripts"
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from render_package import render_package  # noqa: E402

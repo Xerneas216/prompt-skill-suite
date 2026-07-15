@@ -2,7 +2,7 @@
   "fixture_version": "1.0",
   "status": "not_run",
   "baseline_id": "no-skill",
-  "candidate_id": "prompt-skill-suite-v1",
+  "candidate_id": "procraft-v0.2.0",
   "notes": [
     "Provider-neutral fixture; bind conceptual tools to actual runtime contracts before execution.",
     "Numeric gates and repetition counts require approved calibration before pass or fail decisions."

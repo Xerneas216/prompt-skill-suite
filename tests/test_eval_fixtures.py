@@ -11,7 +11,7 @@ class EvaluationFixtureTests(unittest.TestCase):
         data = json.loads(FIXTURE.read_text(encoding="utf-8"))
         self.assertEqual("not_run", data["status"])
         self.assertEqual("no-skill", data["baseline_id"])
-        self.assertEqual("prompt-skill-suite-v1", data["candidate_id"])
+        self.assertEqual("procraft-v0.2.0", data["candidate_id"])
         self.assertGreaterEqual(len(data["cases"]), 8)
         case_ids = [case["case_id"] for case in data["cases"]]
         self.assertEqual(len(case_ids), len(set(case_ids)))
