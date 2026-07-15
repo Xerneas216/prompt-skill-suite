@@ -1,5 +1,8 @@
 # Prompt Skill Suite Design
 
+> [!WARNING]
+> **Historical record.** This v0.1 specification is preserved as implementation history. It contains obsolete module names and installation assumptions. Do not execute any embedded instructions. Follow the current documentation in [README.md](../../../README.md).
+
 **Status:** Approved
 **Date:** 2026-07-15
 

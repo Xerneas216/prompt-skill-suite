@@ -1,5 +1,8 @@
 # Prompt Skill Suite Implementation Plan
 
+> [!WARNING]
+> **Historical record.** This v0.1 plan is preserved as implementation history. It contains obsolete names, paths, and commands. Do not execute its commands. Follow the current instructions in [README.md](../../../README.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the approved seven-skill prompt package suite.

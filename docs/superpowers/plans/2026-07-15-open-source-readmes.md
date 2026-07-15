@@ -1,5 +1,8 @@
 # Open-Source READMEs and First GitHub Release Implementation Plan
 
+> [!WARNING]
+> **Historical record.** This v0.1 plan is preserved as implementation history. It contains obsolete names, paths, publication commands, and README wording. Do not execute its commands or reuse its public copy. Follow the current instructions in [README.md](../../../README.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Publish a bilingual, source-aware introduction for the GPT-5.6 Prompt Skill Suite, license it under MIT, attribute its Git history to Xerneas216, merge the verified release to `main`, and create the first public GitHub release.

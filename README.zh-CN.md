@@ -1,209 +1,180 @@
-# GPT-5.6 Prompt Skill Suite
+# ProCraft 🛠️
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-## 项目概览
+ProCraft 可以把一个模糊的 Prompt 想法，整理成能直接交给模型或 Agent 使用的指令。简单需求直接给成品，生产级工作流再进入任务契约、工具规则、校验和评测。
 
-GPT-5.6 Prompt Skill Suite 是一套由七个 Codex skills 组成的 Prompt 工程工具集，用于把自然语言形式的 Prompt 需求转换为经过审查、符合 Schema 且可以评测的 **PromptPackage v1**。
+它为 Codex 设计，并围绕 GPT-5.6 调校。当前项目版本是 `v0.2.0`，产物格式继续使用 PromptPackage Schema v1.0。
 
-这套工具不只是生成一段 Prompt。它会先定义任务契约，再将需求路由给通用任务、工具 Agent 或软件工程等适用模块，随后进行语义审查、校验规范 JSON、确定性渲染 Markdown，并如实记录动态评测已经执行、失败或尚未运行。
+## 这个项目从哪里来
 
-这是一个独立维护的非官方开源项目，与 OpenAI 不存在隶属关系，也未获得 OpenAI 背书。
-
-## 项目来源与设计原则
-
-这个项目最初希望把以下两份 OpenAI 文档中的实践建议转化为可以复用的 Codex 工作流：
+ProCraft 的起点是 OpenAI 的两份文档：
 
 - [GPT-5.6 Prompt 指南](https://developers.openai.com/api/docs/guides/prompt-guidance-gpt-5p6)
 - [GPT-5.6 模型指南](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.6)
 
-本项目对这些指导的理解可以概括为：
+它们给出的实用思路很直接：把目标、证据、权限和完成条件说清楚，同时别把模型的每一步推理都写死。
 
-- **先定义结果。** 明确用户最终要获得什么、有哪些约束和证据、怎样才算成功，以及何时应该停止；不强行规定每一步推理过程。
-- **保持 Prompt 精简。** 删除重复规则、无效示例、相互矛盾的约束和与任务无关的工具，只保留确实会改变行为的要求。
-- **建立清晰的 Prompt Contract。** 分开描述角色、个性、协作方式、目标、成功标准、约束、证据、权限、输出和停止条件，并完整保留用户显式指定的值。
-- **集中定义自主权边界。** 允许模型继续执行安全且范围内的本地工作；外部写入、破坏性操作、购买以及实质性扩大范围必须先获得确认。
-- **有意识地路由工具。** 只暴露相关工具，行动前先完成必要检索；独立读取可以并行，有依赖关系的调用保持顺序，并为无结果或不完整结果设计有效回退。
-- **限制 Programmatic Tool Calling 的边界。** PTC 适合过滤、连接、排序、去重、聚合、批处理和重复校验等确定性缩减；审批、语义判断、引用处理和最终验证仍交给模型直接完成。
-- **让研究建立在证据上。** 将引用放在所支持的陈述附近，区分来源事实和推断，指出来源冲突；证据不足时缩小结论或说明缺口，不进行猜测。
-- **按阶段管理长任务。** 开始工具调用前给出简短说明，只在主要阶段变化时更新具体结果和下一步；在有意义的里程碑进行压缩，避免旧推理锚定已经变化的目标。
-- **根据工作负载选择模型参数。** 这套工具把 `gpt-5.6`（Sol 路由）作为质量优先基线，把 `gpt-5.6-terra` 视为成本平衡候选，把 `gpt-5.6-luna` 视为高吞吐候选。新任务从 `medium` reasoning 开始评测，只有代表性评测证明有收益时才采用更高设置。
-- **区分默认详细度和任务要求。** 使用 `text.verbosity` 控制请求级默认详细程度，把必须保留的事实、结构、长度、限制和警告写入 Prompt Contract。
-- **验证真正交付的产物。** 软件修改后执行针对性检查，无法运行的检查必须披露；前端任务保留现有设计系统，视觉产物在完成前必须渲染并检查。
-- **用评测推动迁移。** 每次只改变一组 Prompt、工具或 reasoning 参数。只有输出质量仍达到基线时，Token、延迟、成本或调用次数下降才算收益。
+ProCraft 提炼并落实了这些做法：
 
-以上内容是本项目的精炼理解，不能替代官方文档。当前 API 细节、限制、价格和功能可用性应以链接中的官方指南为准。
+- 先写清结果、成功标准、证据、约束和停止条件。用户明确指定的值必须原样保留。
+- 删掉重复指令、冲突规则、无关示例和任务用不到的工具。
+- 范围内且安全的工作可以继续做。破坏性操作、外部写入、购买或实质性扩展范围，需要先获得批准。
+- 行动前先取得前置资料。互不依赖的读取可以并行，有依赖的调用保持顺序，工具空结果也要有实际可用的回退方案。
+- Programmatic Tool Calling 只处理边界明确的确定性缩减，例如过滤、连接、排序、去重、聚合、批处理和重复校验。审批与语义判断仍由模型直接完成。
+- 引用应靠近它支持的陈述。推断要明确标注，来源冲突要说出来，缺证据时不能靠猜测补齐。
+- reasoning effort 和 `text.verbosity` 是要通过评测选择的控制项，不是默认越高越好。新任务从 `medium` 开始，更高设置需要实际收益证据。
+- 验证用户最终拿到的东西。软件类 Prompt 应要求针对性测试，如实披露未运行的检查，视觉工作则要先渲染再验收。
+- 迁移时一次只改一组 Prompt、工具或模型参数。输出质量达到基线之后，成本和延迟下降才算收益。
 
-## 这套 Skills 会生成什么
+用户没有指定模型时，ProCraft 把 `gpt-5.6` 作为质量优先默认值；`gpt-5.6-terra` 是成本平衡候选，`gpt-5.6-luna` 是高吞吐候选。这些只是评测起点，不会自动替你升级。
 
-一次完整运行可以交付：
+当前 API 行为、限制、价格和功能可用性，仍以链接中的官方文档为准。
 
-- `prompt-package.json`：PromptPackage v1 的唯一规范来源。
-- `prompt-package.md`：只从通过校验的 JSON 确定性生成的人类可读版本。
-- 静态验证：语义审查、JSON Schema 校验和跨字段引用检查。
-- 评测记录：代表性用例、基线比较以及如实记录的 `pass`、`fail` 或 `not_run` 状态。
+## 什么情况下会触发 🎯
 
-可选配置只在适用时出现。例如，只有使用工具的任务才会包含 `tool_policy`；只有存在有边界的确定性处理阶段才会包含 PTC 配置；单轮任务不会输出持久化 reasoning 配置。
+ProCraft 看的是用户要交付什么。只有用户明确想要 Prompt、系统指令、developer 或 user message、Agent 规则、工具策略、Structured Output 契约，或其他可复用模型指令时，它才应该自动参与。
 
-## Skills 组成
+普通写作、邮件、研究、摘要、编程和代码诊断不会触发 ProCraft。只要用户要的是执行这些工作的 Prompt 或模型指令，才会触发。
 
-| Skill | 职责 |
+| 用户请求 | 是否触发 |
 |---|---|
-| `building-prompt-packages` | 唯一面向用户的通用入口；负责路由需求、组合适用模块、校验 PromptPackage、渲染 Markdown 并组织交付。 |
-| `defining-prompt-contracts` | 把原始需求归一化为目标、成功标准、证据要求、权限、输出规则和停止条件。 |
-| `prompting-general-tasks` | 处理研究、分析、写作、改写、摘要、提取等通用知识工作模式。 |
-| `prompting-tool-agents` | 定义工具路由、检索、引用、审批、PTC 边界、长任务状态和失败回退。 |
-| `prompting-software-engineering` | 覆盖诊断、实现、测试、审查、前端开发和视觉验证。 |
-| `reviewing-prompt-packages` | 检查重复、矛盾、过度约束、缺项、无关工具和不可验证的要求。 |
-| `evaluating-prompt-packages` | 生成代表性用例，记录实际执行证据，并将候选 Prompt 与基线比较。 |
+| "帮我写一封邮件，把周五的会议改期。" | 否。交付物是邮件。 |
+| "研究一下现在有哪些 API 方案。" | 否。交付物是研究结果。 |
+| "修一下解析器的回归问题。" | 否。交付物是代码修改。 |
+| "写一个用于生成邮件的 Prompt，输入是几条会议信息。" | 是。交付物是 Prompt。 |
+| "为这个 Agent 设计 system、developer 和 user messages。" | 是。交付物是模型指令。 |
+| "检查这份工具策略有没有漏掉审批边界。" | 是。交付物本身属于 Prompt 系统。 |
 
-## 工作流
+想明确调用时，直接在请求开头写 `$procraft`。Codex 目前不支持自定义 `@ProCraft` Skill 语法。
+
+## 快速模式和完整模式
+
+除非用户明确选择模式，ProCraft 会走能完成任务的最短路线。
+
+| 模式 | 适用情况 | 交付内容 |
+|---|---|---|
+| 快速模式 | 单轮 Prompt，不使用工具，没有副作用，也不要求基线评测。 | 可直接使用的 Prompt、必要变量和重要假设。 |
+| 完整模式 | 生产复用、多层消息、Structured Outputs、工具或审批、长期 Agent、仓库工作、Prompt 审查评测或模型迁移。 | 通过校验的 PromptPackage、渲染版 Markdown、静态审查和有证据的评测状态。 |
+
+需求不够清楚时，ProCraft 会先给出可用的快速模式结果，并说明可以升级为完整模式。一个小 Prompt 不会被硬塞进空洞的大礼包。
+
+## 内部怎么配合
+
+项目采用一个公开入口和六个内部模块。多数用户只需要 `procraft`，其余模块会在流程走到对应阶段时加入。
+
+| 模块 | 在工作流中的职责 |
+|---|---|
+| `procraft` | 选择快速或完整模式，路由任务，检查完成条件并交付结果。 |
+| `defining-prompt-contracts` | 把需求整理成目标、成功标准、证据、权限、输出规则和停止条件。 |
+| `prompting-general-tasks` | 处理研究、分析、写作、改写、摘要和提取类 Prompt。 |
+| `prompting-tool-agents` | 定义工具路由、检索、引用、审批、PTC 边界、状态和回退。 |
+| `prompting-software-engineering` | 覆盖诊断、代码修改、测试、审查、前端和视觉检查。 |
+| `reviewing-prompt-packages` | 查找矛盾、重复、缺项、无关工具和无法验证的要求。 |
+| `evaluating-prompt-packages` | 生成代表性用例，记录执行证据，并与基线比较。 |
+
+完整模式遵循固定数据流：
 
 ```text
-自然语言需求
+用户需求
   -> Prompt Contract
-  -> 场景模块
-  -> 候选 Prompt
+  -> 适用的内部模块
+  -> 候选 PromptPackage JSON
   -> 静态审查
   -> JSON 校验
-  -> Markdown 渲染
-  -> 动态评测
+  -> 确定性渲染 Markdown
+  -> 动态评测或 not_run
   -> 最终交付
 ```
 
-`prompt-package.json` 是唯一规范来源。`prompt-package.md` 不会被独立维护：渲染器只读取已经通过校验的 PromptPackage，并按照固定顺序生成内容。
+`prompt-package.json` 是唯一规范来源，`prompt-package.md` 只从通过校验的 JSON 按固定顺序生成，因此两份产物不会各写各的。可选字段只在适用时出现，例如无工具任务不会塞入空的 `tool_policy`。
 
-## 环境要求
+## 安装 🚀
 
-- Windows 和 PowerShell，用于运行本文档中的命令。
-- 支持 `venv` 的 Python 3。
-- 支持本地 skills 的 Codex。
-- Git，用于克隆项目和参与贡献。
-
-运行时校验依赖 `jsonschema>=4.23,<5`；开发和元数据检查还使用 `PyYAML>=6,<7`。
-
-## 初始化仓库
+下面的命令适用于 Windows PowerShell，并需要 Python 3 和 Git。
 
 ```powershell
-git clone https://github.com/Xerneas216/prompt-skill-suite.git
-Set-Location prompt-skill-suite
+git clone https://github.com/Xerneas216/ProCraft.git
+Set-Location ProCraft
 py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-最后一条命令会在安装或修改 Skills 之前建立本地确定性测试基线。
-
-## 安装 Skills
-
-先预览安装内容，不写入任何文件：
+先预览安装动作：
 
 ```powershell
 .\.venv\Scripts\python.exe install_skills.py --dry-run
 ```
 
-将七个 Skills 安装到默认 Codex skills 目录：
+确认后安装到 `%USERPROFILE%\.codex\skills`：
 
 ```powershell
 .\.venv\Scripts\python.exe install_skills.py
 ```
 
-默认目标是 `<home>/.codex/skills`，在 Windows 上对应 `%USERPROFILE%\.codex\skills`。安装器会：
+全新安装遇到同名目录会直接停止。如果安装器发现未修改的 v0.1.0 旧安装，则可以报告 `legacy_migration` 并安全迁移。只有旧清单、全部预期文件和每个 SHA-256 哈希都与仓库提交的 v0.1.0 信任锚完全一致时，迁移才会继续。文件缺失、被修改、多出内容或迁移期间发生并发变化，都会在发布前终止。暂存和回滚会在发布失败时保护原安装。
 
-- 只发现同时包含 `SKILL.md` 和 `agents/openai.yaml` 的 skill 目录；
-- 在发布任何文件之前拒绝全部同名冲突；
-- 通过唯一暂存目录复制清单中列出的源文件；
-- 在发布前后检查完整文件集合和 SHA-256 哈希；
-- 仅在安装副本验证通过后写入 `.prompt-skill-suite-manifest.json`；
-- 不覆盖已有 Skill 或已有清单。
+安装状态记录在 `.procraft-manifest.json`。安装完成后新建一个 Codex 任务，让本地 Skill 发现机制刷新。
 
-如果检测到冲突，请先检查并有意识地处理现有安装；安装器不会自动覆盖。安装完成后新建一个 Codex 任务，让 Skill 发现机制刷新。
+## 开始使用
 
-## 使用方法
+一个快速模式请求可以很短：
 
-在新的 Codex 任务中，用自然语言描述你希望构建的 PromptPackage。`building-prompt-packages` 会作为入口，并自动选择适用的专家模块。
+> `$procraft` 创建一个可复用 Prompt，把零散会议记录整理成简洁的跟进邮件，承诺和日期不能改变。
 
-通用来源型任务：
+完整模式可以带上工具与审批规则：
 
-> 为政策文档摘要构建一个高质量 PromptPackage。保留所有事实限定，引用所提供的来源，并在不丢失重要警告的前提下保持最终回答简洁。
+> `$procraft` 为一个生产 Agent 构建 PromptPackage。它需要检索账户与政策证据，说明空结果回退，并在任何外部写入前请求批准。
 
-工具 Agent 任务：
+软件工程 Prompt 也可以这样提：
 
-> 为一个检索账户与政策证据的 Agent 构建 PromptPackage。说明空结果回退，并要求任何外部写入都先获得批准。
+> 为诊断并修复 Python 回归问题创建模型指令。诊断阶段保持只读；获得修复授权后运行针对性测试，并披露所有未能执行的检查。
 
-软件工程任务：
-
-> 为诊断并修复 Python 回归问题构建 PromptPackage。仅诊断时不得修改文件；授权修复后必须运行针对性测试，并披露所有无法完成的验证。
-
-研究与实现混合任务：
-
-> 为一项混合任务构建 PromptPackage：先研究当前 API 要求并引用一手来源，再更新范围内的集成代码并验证行为，不得扩大项目范围。
-
-默认对话交付包含两层：
-
-1. 简洁的路由、模型设置、验证状态和遗留风险摘要。
-2. 规范 JSON 内容，以及从该 JSON 渲染得到的 Markdown。
-
-只有用户明确要求文件交付时，这套工具才会把 `prompt-package.json` 和 `prompt-package.md` 写入磁盘。
+快速模式会返回 Prompt、变量和假设。完整模式会返回规范 JSON，以及从该 JSON 渲染出的 Markdown。只有用户明确要求文件交付时，ProCraft 才会把 `prompt-package.json` 和 `prompt-package.md` 写入磁盘。
 
 ## 校验并渲染 PromptPackage
 
-校验候选 PromptPackage：
+校验规范 JSON：
 
 ```powershell
-.\.venv\Scripts\python.exe skills\building-prompt-packages\scripts\validate_package.py prompt-package.json
+.\.venv\Scripts\python.exe skills\procraft\scripts\validate_package.py prompt-package.json
 ```
 
-只有校验成功后才渲染 Markdown：
+校验成功后渲染 Markdown：
 
 ```powershell
-.\.venv\Scripts\python.exe skills\building-prompt-packages\scripts\render_package.py prompt-package.json --output prompt-package.md
+.\.venv\Scripts\python.exe skills\procraft\scripts\render_package.py prompt-package.json --output prompt-package.md
 ```
 
-校验器不仅检查 JSON Schema，还会检查显式值保留、场景模块覆盖、消息层分离、工具引用、依赖环、PTC 引用、审批规则、内嵌 Schema 和评测证据等语义不变量。
+校验器会检查 Schema 和语义引用，包括用户显式值、场景模块、消息层、工具引用、依赖环、PTC、审批、内嵌 Schema 和评测证据。
 
-## 验证状态
+## 验证状态 🧪
 
-确定性测试覆盖：
+确定性测试覆盖 PromptPackage 校验、Markdown 确定性渲染、与供应商无关的评测夹具、触发契约，以及包含可信迁移与回滚在内的安装器安全行为。
 
-- PromptPackage Schema 和语义校验；
-- 工具、依赖、PTC 和模块引用；
-- Markdown 确定性渲染和安全代码围栏；
-- 与供应商无关的评测夹具结构；
-- 安装冲突、暂存失败、发布竞争、精确文件集合以及源码到副本的哈希。
-
-新鲜上下文动态评测是独立的质量门槛。如果没有合适的运行环境，其状态会保持为 `not_run`；确定性测试通过不等于模型质量已经得到动态验证。
+新鲜上下文动态评测是另一道门槛。没有实际执行证据时，其状态必须保持 `not_run`。单元测试通过不能把它变成模型质量已经验证的结论。
 
 ## 仓库结构
 
 ```text
-prompt-skill-suite/
-├── skills/                 # 七个源 Skills
-├── evals/                  # 代表性用例和 RED/GREEN 记录
+ProCraft/
+├── skills/                 # 公开入口和内部模块
+├── evals/                  # 代表性用例和证据记录
 ├── tests/                  # 确定性 unittest 测试
-├── tools/                  # 安装器实现
-├── docs/superpowers/       # 已批准的设计和实施记录
-├── install_skills.py       # 根目录安装入口
-├── requirements.txt        # 运行时依赖
+├── tools/                  # 安装器和迁移信任锚
+├── docs/superpowers/       # 历史设计与实施记录
+├── install_skills.py       # 安装入口
+├── requirements.txt        # 运行依赖
 └── requirements-dev.txt    # 开发依赖
 ```
 
-规范 Schema 位于 `skills/building-prompt-packages/references/prompt-package.schema.json`。校验器和渲染器位于入口 Skill 的 `scripts/` 目录。
-
-## 项目状态
-
-初始版本具有以下边界：
-
-- 面向 Codex skills；
-- 以 GPT-5.6 为优先目标，后续 GPT-5.x 必须重新评测后才能采用；
-- 使用 Windows 和 PowerShell 编写并验证使用文档；
-- 提供与供应商无关的评测夹具，不要求 OpenAI API Key；
-- 不包含插件、Web UI、托管服务、包注册表发布或其他模型供应商适配器。
+PromptPackage Schema 位于 `skills/procraft/references/prompt-package.schema.json`，校验器和渲染器位于 `skills/procraft/scripts/`。
 
 ## 参与贡献
 
-欢迎提交范围明确的 Issue 和 Pull Request。请说明观察到的 Prompt 失败或缺失行为，提供代表性用例，保持指导精简，并附上证明修改合理的验证证据。涉及模型指导的修改应链接当前一手文档，不得静默覆盖用户显式值或已有评测基线。
+一项有用的修改，应该从真实失败或缺失行为开始。请添加代表性用例，把新增指导控制在解决问题所需的最小范围，并附上能证明修改有效的检查。模型指导的变化应引用当前一手文档，同时保留用户显式选择和已有评测基线。
 
 ## 开源许可
 
-本项目采用 [MIT License](LICENSE) 开源。Copyright (c) 2026 Xerneas216。
+[MIT License](LICENSE)，Copyright (c) 2026 Xerneas216。

@@ -1,209 +1,180 @@
-# GPT-5.6 Prompt Skill Suite
+# ProCraft 🛠️
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-## Overview
+ProCraft turns a rough idea for an AI prompt into instructions you can paste into a model or agent and use. Small requests stay small. Production workflows get the contracts, tool rules, validation, and evaluation records they need.
 
-GPT-5.6 Prompt Skill Suite is a collection of seven Codex skills for turning a natural-language prompt requirement into a reviewed, schema-valid, and evaluable **PromptPackage v1**.
+It is built for Codex and tuned around GPT-5.6. The current project release is `v0.2.0`; the packaged artifact format remains PromptPackage Schema v1.0.
 
-The suite does more than draft a prompt. It first defines the task contract, routes the request through the relevant general, tool-agent, or software-engineering specialists, checks the result for semantic defects, validates the canonical JSON, renders a deterministic Markdown view, and records what evaluation was or was not performed.
+## Where it came from
 
-This is an independent, unofficial open-source project. It is not affiliated with or endorsed by OpenAI.
-
-## Origin and design principles
-
-The project began as an effort to turn the practical guidance in two OpenAI documents into reusable Codex workflows:
+ProCraft grew out of two OpenAI guides:
 
 - [Prompting guidance for GPT-5.6](https://developers.openai.com/api/docs/guides/prompt-guidance-gpt-5p6)
 - [GPT-5.6 model guidance](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.6)
 
-The suite interprets that guidance through the following principles:
+The practical idea is simple: make intent, evidence, permissions, and completion criteria visible without scripting every reasoning step.
 
-- **Start with the outcome.** State the user-visible result, constraints, evidence, success criteria, and stopping conditions. Avoid prescribing every reasoning step.
-- **Keep prompts lean.** Remove repeated rules, redundant examples, contradictions, and tools unrelated to the task. Keep requirements that materially change behavior.
-- **Use an explicit prompt contract.** Separate role, personality, collaboration style, goal, success criteria, constraints, evidence, permissions, output, and stop rules. Preserve every explicit user value.
-- **Define autonomy boundaries once.** Let the model perform safe, in-scope local work while requiring approval for external writes, destructive actions, purchases, and material scope expansion.
-- **Route tools deliberately.** Expose only relevant tools, resolve prerequisites before acting, parallelize independent reads, sequence dependent calls, and use meaningful fallbacks for empty or partial results.
-- **Bound Programmatic Tool Calling.** Use PTC for deterministic reduction such as filtering, joining, ranking, deduplication, aggregation, batching, or repeated validation. Keep approvals, semantic judgment, citations, and final validation under direct model control.
-- **Ground research in evidence.** Cite retrieved sources near supported claims, distinguish inference from sourced facts, surface conflicts, and report missing evidence instead of guessing.
-- **Manage long work by outcomes.** Use a short preamble and sparse progress updates at major phase changes. Compact at meaningful milestones and avoid carrying stale reasoning into changed objectives.
-- **Choose model controls by workload.** The suite uses `gpt-5.6` (the Sol route) as its quality-first baseline, treats `gpt-5.6-terra` as a cost-balanced candidate, and treats `gpt-5.6-luna` as a high-volume candidate. New tasks start evaluation at `medium` reasoning; higher settings are adopted only when representative evaluations show a benefit.
-- **Separate default detail from task requirements.** Use `text.verbosity` for request-wide detail and the prompt contract for required structure, length, facts, caveats, and preservation rules.
-- **Verify the artifact that matters.** Run targeted checks after software changes, disclose checks that could not run, preserve existing design systems, and render visual work before finalizing it.
-- **Migrate through measurement.** Change one prompt, tool, or reasoning variable at a time. Treat lower tokens, latency, cost, or call counts as improvements only after output quality still meets the baseline.
+ProCraft carries these rules into its workflow:
 
-These points are the project's concise interpretation, not a replacement for the official documentation. Consult the linked guides for current API details, limits, pricing, and feature availability.
+- Describe the result, success criteria, evidence, constraints, and stop rules. Keep every value the user explicitly chose.
+- Cut repeated instructions, conflicting rules, irrelevant examples, and tools that the task does not need.
+- Give the model room to complete safe work inside scope. Require approval for destructive actions, outside writes, purchases, or a real expansion of scope.
+- Retrieve prerequisites before acting. Run unrelated reads in parallel, keep dependent calls in order, and say what happens when a tool returns nothing useful.
+- Reserve Programmatic Tool Calling for bounded reduction work such as filtering, joining, ranking, deduplication, aggregation, batching, or repeated validation. Approval and semantic judgment stay with the model.
+- Put citations beside the claims they support. Mark inference as inference, surface source conflicts, and do not fill evidence gaps with guesses.
+- Treat reasoning effort and `text.verbosity` as controls to evaluate, not decorations to turn up by default. New work starts at `medium`; higher settings need evidence that they help.
+- Verify the artifact the user will actually receive. A software prompt should demand targeted tests, honest disclosure of checks that could not run, and rendered inspection for visual work.
+- Change one prompt, tool, or model control at a time during migration. Lower cost or latency matters only after quality still meets the baseline.
 
-## What the suite produces
+ProCraft uses `gpt-5.6` as its quality-first default when the user has not chosen a model. `gpt-5.6-terra` is a cost-balanced candidate and `gpt-5.6-luna` is a throughput candidate. Those are starting points for evaluation, not automatic upgrades.
 
-A completed run can deliver:
+The linked guides remain the source for current API behavior, limits, pricing, and availability.
 
-- `prompt-package.json`: the canonical PromptPackage v1 source of truth.
-- `prompt-package.md`: a deterministic human-readable rendering produced only from valid JSON.
-- Static verification: semantic review plus JSON Schema and cross-reference validation.
-- Evaluation records: representative cases and baseline comparison with honest `pass`, `fail`, or `not_run` status.
+## When ProCraft should wake up 🎯
 
-Optional sections are emitted only when they apply. For example, `tool_policy` appears only for tool-using requests, PTC configuration appears only for bounded deterministic processing, and persistent reasoning configuration is omitted from single-turn work.
+The trigger follows the requested deliverable. ProCraft can start automatically when the user wants a prompt, system instruction, developer or user message, agent rule, tool policy, Structured Output contract, or another reusable instruction for a model.
 
-## Skills
+Ordinary writing, email, research, summarization, coding, and code diagnosis do not trigger ProCraft. Ask for the prompt or model instructions that will perform that work, and it does.
 
-| Skill | Responsibility |
+| Request | ProCraft? |
 |---|---|
-| `building-prompt-packages` | The only broad user-facing entry. Routes the request, composes applicable modules, validates the package, renders Markdown, and coordinates delivery. |
-| `defining-prompt-contracts` | Converts the request into goals, success criteria, evidence requirements, permissions, output rules, and stopping conditions. |
-| `prompting-general-tasks` | Handles research, analysis, writing, rewriting, summarization, extraction, and other general knowledge-work patterns. |
-| `prompting-tool-agents` | Defines tool routing, retrieval, citations, approvals, PTC boundaries, long-task state, and fallbacks. |
-| `prompting-software-engineering` | Covers diagnosis, implementation, testing, review, frontend work, and visual verification. |
-| `reviewing-prompt-packages` | Finds repetition, contradictions, over-constraint, missing fields, irrelevant tools, and unverifiable requirements. |
-| `evaluating-prompt-packages` | Creates representative cases, records execution evidence, and compares candidate prompts with a baseline. |
+| "Write an email to move Friday's meeting." | No. The deliverable is the email. |
+| "Research the current API options." | No. The deliverable is research. |
+| "Fix the parser regression." | No. The deliverable is a code change. |
+| "Write a prompt that writes an email from a few meeting details." | Yes. The deliverable is a prompt. |
+| "Design the system, developer, and user messages for this agent." | Yes. The deliverable is model instructions. |
+| "Review this tool policy for approval gaps." | Yes. The deliverable itself is part of a prompt system. |
 
-## Workflow
+For an explicit call, start the request with `$procraft`. Codex does not currently use a custom `@ProCraft` Skill syntax.
+
+## Fast or Full
+
+ProCraft picks the smallest useful route unless you choose a mode yourself.
+
+| Mode | Use it when | You get |
+|---|---|---|
+| Fast mode | The prompt is single-turn, has no tools or side effects, and does not need a baseline evaluation. | A ready-to-use prompt, its required variables, and material assumptions. |
+| Full mode | The prompt is for production reuse, layered messages, Structured Outputs, tools or approvals, a long-running agent, repository work, review, evaluation, or model migration. | A validated PromptPackage, rendered Markdown, static review, and an evidence-backed evaluation status. |
+
+If the request is unclear, ProCraft returns a useful Fast mode result and offers the Full mode path. It does not inflate a small prompt into an empty package.
+
+## How the pieces fit
+
+The project has one public gateway and six internal specialists. Most users only need `procraft`; the other modules join when that workflow reaches their stage.
+
+| Module | Job inside the workflow |
+|---|---|
+| `procraft` | Chooses Fast or Full mode, routes the work, checks completion, and delivers the result. |
+| `defining-prompt-contracts` | Turns the request into goals, success checks, evidence, permissions, output rules, and stop conditions. |
+| `prompting-general-tasks` | Handles research, analysis, writing, rewriting, summary, and extraction prompt patterns. |
+| `prompting-tool-agents` | Defines tool routing, retrieval, citations, approvals, PTC boundaries, state, and fallbacks. |
+| `prompting-software-engineering` | Covers diagnosis, code changes, tests, review, frontend work, and visual checks. |
+| `reviewing-prompt-packages` | Finds contradictions, duplication, missing rules, irrelevant tools, and unverifiable requirements. |
+| `evaluating-prompt-packages` | Builds representative cases, records execution evidence, and compares a candidate with its baseline. |
+
+Full mode follows one fixed path:
 
 ```text
-Natural-language request
-  -> Prompt Contract
-  -> Scenario modules
-  -> Candidate Prompt
+Request
+  -> Prompt contract
+  -> Applicable specialists
+  -> Candidate PromptPackage JSON
   -> Static review
   -> JSON validation
-  -> Markdown rendering
-  -> Dynamic evaluation
+  -> Deterministic Markdown rendering
+  -> Dynamic evaluation or not_run
   -> Delivery
 ```
 
-`prompt-package.json` is authoritative. `prompt-package.md` is never maintained independently: the renderer reads a package that has already passed validation and produces sections in a fixed order.
+`prompt-package.json` is canonical. `prompt-package.md` is rendered from valid JSON in a fixed order, so the two files do not drift apart. Optional fields appear only when the task needs them. A tool-free task, for example, has no empty `tool_policy` block.
 
-## Requirements
+## Install it 🚀
 
-- Windows with PowerShell for the documented commands.
-- Python 3 with `venv` support.
-- Codex with local skills support.
-- Git for cloning and contributing.
-
-Runtime validation uses `jsonschema>=4.23,<5`. Development and metadata checks also use `PyYAML>=6,<7`.
-
-## Set up the repository
+The documented commands use Windows PowerShell, Python 3, and Git.
 
 ```powershell
-git clone https://github.com/Xerneas216/prompt-skill-suite.git
-Set-Location prompt-skill-suite
+git clone https://github.com/Xerneas216/ProCraft.git
+Set-Location ProCraft
 py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-The final command establishes a local deterministic-test baseline before installation or modification.
-
-## Install the skills
-
-Preview the installation without writing anything:
+Preview the installation:
 
 ```powershell
 .\.venv\Scripts\python.exe install_skills.py --dry-run
 ```
 
-Install all seven skills into the default Codex skills directory:
+Then install into `%USERPROFILE%\.codex\skills`:
 
 ```powershell
 .\.venv\Scripts\python.exe install_skills.py
 ```
 
-The default target is `<home>/.codex/skills` (`%USERPROFILE%\.codex\skills` on Windows). The installer:
+A clean install refuses same-name conflicts. If it finds an untouched v0.1.0 installation, the installer can report `legacy_migration` and replace it safely. Migration proceeds only when the old manifest, every expected file, and every SHA-256 hash match the committed v0.1.0 trust anchors exactly. Missing, edited, extra, or concurrently changed content stops the migration before publication. Staging and rollback protect the old copy if publication fails.
 
-- discovers exactly the skill directories containing `SKILL.md` and `agents/openai.yaml`;
-- refuses all same-name conflicts before publishing files;
-- copies only manifest-listed source files through a unique staging directory;
-- verifies the complete file set and SHA-256 hashes before and after publication;
-- writes `.prompt-skill-suite-manifest.json` only after the installed copy is verified;
-- avoids overwriting an existing installation or manifest.
+The installed state is recorded in `.procraft-manifest.json`. Start a new Codex task after installation so local Skill discovery refreshes.
 
-If a conflict is reported, inspect and resolve the existing installation deliberately; the installer will not overwrite it. Start a new Codex task after installation so skill discovery refreshes.
+## Use it
 
-## Use the suite
+Fast mode can be as short as:
 
-In a new Codex task, describe the prompt package you want in natural language. `building-prompt-packages` is the entry point and automatically selects the applicable specialists.
+> `$procraft` Create a reusable prompt that turns rough meeting notes into a concise follow-up email. Keep commitments and dates unchanged.
 
-General, source-backed work:
+Full mode can carry tool and approval policy:
 
-> Build a high-quality prompt package for summarizing policy documents. Preserve every factual qualification, cite the supplied sources, and keep the final answer concise without dropping material caveats.
+> `$procraft` Build a production PromptPackage for an agent that retrieves account and policy evidence, explains empty-result fallbacks, and asks for approval before any outside write.
 
-Tool-agent work:
+You can also ask for software behavior:
 
-> Build a prompt package for an agent that retrieves account and policy evidence, explains empty-result fallbacks, and asks for approval before any external write.
+> Create model instructions for diagnosing and fixing a Python regression. Diagnosis must stay read-only. An authorized fix must run targeted tests and disclose checks that could not run.
 
-Software-engineering work:
-
-> Build a prompt package for diagnosing and fixing a Python regression. Diagnosis alone must not modify files; an authorized fix must run targeted tests and disclose anything that could not be verified.
-
-Mixed research and implementation:
-
-> Build a prompt package for researching the current API requirements, citing primary sources, updating the in-scope integration, and validating the changed behavior without expanding the project scope.
-
-Conversation delivery returns two layers:
-
-1. A concise routing, model-settings, verification-status, and residual-risk summary.
-2. The canonical JSON content followed by the Markdown rendered from that JSON.
-
-The suite writes `prompt-package.json` and `prompt-package.md` to disk only when the user explicitly requests file delivery.
+Fast mode replies with the prompt, variables, and assumptions. Full mode replies with canonical JSON plus Markdown rendered from that JSON. ProCraft writes `prompt-package.json` and `prompt-package.md` to disk only when the user asks for files.
 
 ## Validate and render a package
 
-Validate a candidate package:
+Validate the canonical JSON:
 
 ```powershell
-.\.venv\Scripts\python.exe skills\building-prompt-packages\scripts\validate_package.py prompt-package.json
+.\.venv\Scripts\python.exe skills\procraft\scripts\validate_package.py prompt-package.json
 ```
 
-Render Markdown only after validation succeeds:
+Render Markdown after validation succeeds:
 
 ```powershell
-.\.venv\Scripts\python.exe skills\building-prompt-packages\scripts\render_package.py prompt-package.json --output prompt-package.md
+.\.venv\Scripts\python.exe skills\procraft\scripts\render_package.py prompt-package.json --output prompt-package.md
 ```
 
-The validator checks both the JSON Schema and semantic invariants such as explicit-value preservation, scenario-module coverage, message-layer separation, tool references, dependency cycles, PTC references, approval rules, embedded schemas, and evaluation evidence.
+The validator checks the Schema and semantic links: preserved explicit values, scenario coverage, message layers, tool references, dependency cycles, PTC references, approvals, embedded schemas, and evaluation evidence.
 
-## Verification status
+## Verification status 🧪
 
-The deterministic test suite covers:
+The deterministic suite covers PromptPackage validation, deterministic rendering, provider-neutral evaluation fixtures, trigger contracts, and installer safety including trusted migration and rollback.
 
-- PromptPackage schema and semantic validation;
-- tool, dependency, PTC, and module references;
-- deterministic Markdown rendering and safe code fences;
-- provider-neutral evaluation-fixture structure;
-- installer conflicts, staging failures, publication races, exact file sets, and source-to-copy hashes.
+Fresh-context dynamic evaluation is a separate gate. Until it is actually executed with evidence, its status remains `not_run`. Passing unit tests does not convert that status into a model-quality claim.
 
-Fresh-context dynamic evaluation is a separate quality gate. When a suitable runtime is unavailable, its status remains `not_run`; deterministic tests do not turn that status into a model-quality claim.
-
-## Repository layout
+## Repository map
 
 ```text
-prompt-skill-suite/
-├── skills/                 # Seven source skills
-├── evals/                  # Representative cases and RED/GREEN records
+ProCraft/
+├── skills/                 # Public gateway and internal specialists
+├── evals/                  # Representative cases and evidence records
 ├── tests/                  # Deterministic unittest suite
-├── tools/                  # Installer implementation
-├── docs/superpowers/       # Approved design and implementation records
-├── install_skills.py       # Root installation entry point
+├── tools/                  # Verified installer and migration anchors
+├── docs/superpowers/       # Historical design and implementation records
+├── install_skills.py       # Installation entry point
 ├── requirements.txt        # Runtime dependency
 └── requirements-dev.txt    # Development dependencies
 ```
 
-The normative schema is at `skills/building-prompt-packages/references/prompt-package.schema.json`. The validator and renderer live beside the entry skill under `scripts/`.
-
-## Project status
-
-The initial release is:
-
-- designed for Codex skills;
-- GPT-5.6-first, with later GPT-5.x behavior requiring fresh evaluation before adoption;
-- documented and verified on Windows with PowerShell;
-- equipped with provider-neutral evaluation fixtures but no required OpenAI API key;
-- not a plugin, web UI, hosted service, package-registry release, or adapter for other model providers.
+The PromptPackage Schema is at `skills/procraft/references/prompt-package.schema.json`. The validator and renderer sit under `skills/procraft/scripts/`.
 
 ## Contributing
 
-Focused issues and pull requests are welcome. Please explain the observed prompt failure or missing behavior, include a representative case, keep guidance minimal, and provide the verification evidence used to justify the change. Changes to model guidance should link to current primary documentation and must not silently overwrite explicit user values or existing evaluation baselines.
+A useful change starts with an observed failure or missing behavior. Add a representative case, keep the new guidance as small as possible, and include the check that proves the change helps. Model guidance changes should cite current primary documentation and must preserve explicit user choices and evaluation baselines.
 
 ## License
 
-Released under the [MIT License](LICENSE). Copyright (c) 2026 Xerneas216.
+[MIT License](LICENSE), Copyright (c) 2026 Xerneas216.

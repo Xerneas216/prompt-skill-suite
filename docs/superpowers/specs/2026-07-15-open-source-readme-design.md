@@ -1,5 +1,8 @@
 # Open-Source README Design
 
+> [!WARNING]
+> **Historical record.** This v0.1 specification is preserved as implementation history. Its branding and README copy are obsolete. Do not execute any embedded instructions or reuse that copy. Follow the current documentation in [README.md](../../../README.md).
+
 ## Goal
 
 Prepare the GPT-5.6 Prompt Skill Suite for a public GitHub release with clear, source-aware documentation for both international and Chinese-speaking users.
