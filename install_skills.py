@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install the verified Prompt Skill Suite into the configured skills directory."""
+"""Install the verified ProCraft skill suite into the configured skills directory."""
 
 from tools.install_skills import main
 

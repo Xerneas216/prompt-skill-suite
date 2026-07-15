@@ -52,7 +52,8 @@ def write_suite(root, entry_name, marker):
 
 
 def write_legacy_install(target):
-    skill_names = write_suite(target, "building-prompt-packages", "legacy-v0.1.0")
+    # Preserve the alphabetical order emitted by the v0.1.0 installer.
+    skill_names = sorted(write_suite(target, "building-prompt-packages", "legacy-v0.1.0"))
     manifest = {
         "manifest_version": "1.0",
         "source": "known-v0.1.0-release",
@@ -78,21 +79,38 @@ def tree_snapshot(root):
 
 
 class InstallSkillsTests(unittest.TestCase):
-    def test_v0_1_0_release_hashes_are_committed_as_the_trust_anchor(self):
+    def test_v0_1_0_installed_skill_hashes_are_committed_as_the_trust_anchor(self):
+        release_files = subprocess.run(
+            ["git", "ls-tree", "-r", "--name-only", "v0.1.0", "--", "skills"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.splitlines()
+        # The v0.1.0 installer sorted directories and never published skills/.gitkeep.
+        release_skill_names = sorted(["building-prompt-packages", *INTERNAL_SKILLS])
+        release_hashes = {
+            relative.removeprefix("skills/"): hashlib.sha256(
+                subprocess.run(
+                    ["git", "show", f"v0.1.0:{relative}"],
+                    cwd=ROOT,
+                    check=True,
+                    capture_output=True,
+                ).stdout
+            ).hexdigest()
+            for relative in release_files
+            if relative.split("/", 2)[1] in release_skill_names
+        }
         if not KNOWN_LEGACY_MANIFEST.is_file():
             self.fail("tools/legacy-v0.1.0-manifest.json must be committed")
         manifest = json.loads(KNOWN_LEGACY_MANIFEST.read_text(encoding="utf-8"))
         self.assertEqual("v0.1.0", manifest.get("release"))
+        self.assertEqual("1.0", manifest.get("manifest_version"))
         self.assertEqual(
-            ["building-prompt-packages", *INTERNAL_SKILLS],
+            release_skill_names,
             manifest.get("skills"),
         )
-        hashes = manifest.get("files", {})
-        self.assertTrue(hashes)
-        self.assertIn("building-prompt-packages/SKILL.md", hashes)
-        for relative, digest in hashes.items():
-            with self.subTest(relative=relative):
-                self.assertRegex(digest, r"\A[0-9a-f]{64}\Z")
+        self.assertEqual(release_hashes, manifest.get("files"))
 
     def test_root_cli_dry_run_does_not_write(self):
         with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
