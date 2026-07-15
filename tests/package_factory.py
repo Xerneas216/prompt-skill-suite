@@ -89,7 +89,7 @@ def minimal_general_package():
             "generated_at": "2026-07-15T08:00:00Z",
             "schema_version": "1.0",
             "participating_modules": [
-                "procraft",
+                "building-prompt-packages",
                 "defining-prompt-contracts",
                 "prompting-general-tasks",
                 "reviewing-prompt-packages",

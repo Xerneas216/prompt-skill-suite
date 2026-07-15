@@ -155,6 +155,24 @@ class ProCraftSkillContractTests(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertIn(term, full)
 
+    def test_full_mode_defines_the_canonical_package_pipeline_and_dual_delivery(self):
+        full = _section(self._procraft_text(), "Full mode")
+        for term in (
+            "canonical promptpackage",
+            "contract",
+            "specialist",
+            "routing",
+            "static review",
+            "validate",
+            "render",
+            "evaluation",
+            "not_run",
+            "json",
+            "markdown",
+        ):
+            with self.subTest(term=term):
+                self.assertIn(term, full)
+
 
 if __name__ == "__main__":
     unittest.main()

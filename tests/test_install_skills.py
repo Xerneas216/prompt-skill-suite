@@ -150,17 +150,6 @@ class InstallSkillsTests(unittest.TestCase):
             self.assertTrue((target / PROCRAFT_MANIFEST_NAME).is_file())
             self.assertFalse((target / LEGACY_MANIFEST_NAME).exists())
 
-    def _install_with_known_legacy(self, source, target, legacy_manifest, dry_run=False):
-        try:
-            return install_skills(
-                source,
-                target,
-                dry_run=dry_run,
-                known_legacy_manifests=[legacy_manifest],
-            )
-        except TypeError as exc:
-            self.fail(f"installer must support trusted legacy manifests without breaking its existing API: {exc}")
-
     def test_matching_known_legacy_install_migrates_atomically(self):
         with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:
             source = Path(source_dir)
@@ -168,14 +157,28 @@ class InstallSkillsTests(unittest.TestCase):
             new_skills = write_suite(source, "procraft", "v0.2.0")
             legacy_manifest = write_legacy_install(target)
 
-            dry_run = self._install_with_known_legacy(
-                source, target, legacy_manifest, dry_run=True
-            )
+            with patch(
+                "install_skills._load_known_legacy_manifests",
+                return_value=[legacy_manifest],
+                create=True,
+            ):
+                try:
+                    dry_run = install_skills(source, target, dry_run=True)
+                except InstallerError as exc:
+                    self.fail(f"a fully matching trusted legacy install must support dry-run: {exc}")
             self.assertEqual("legacy_migration", dry_run["mode"])
             self.assertTrue((target / "building-prompt-packages").is_dir())
             self.assertFalse((target / "procraft").exists())
 
-            result = self._install_with_known_legacy(source, target, legacy_manifest)
+            with patch(
+                "install_skills._load_known_legacy_manifests",
+                return_value=[legacy_manifest],
+                create=True,
+            ):
+                try:
+                    result = install_skills(source, target)
+                except InstallerError as exc:
+                    self.fail(f"a fully matching trusted legacy install must migrate: {exc}")
 
             self.assertEqual("legacy_migration", result["mode"])
             self.assertEqual(new_skills, result["skills"])
@@ -207,8 +210,13 @@ class InstallSkillsTests(unittest.TestCase):
                 mutate(target)
                 before = tree_snapshot(target)
 
-                with self.assertRaises(InstallerError):
-                    self._install_with_known_legacy(source, target, legacy_manifest)
+                with patch(
+                    "install_skills._load_known_legacy_manifests",
+                    return_value=[legacy_manifest],
+                    create=True,
+                ):
+                    with self.assertRaises(InstallerError):
+                        install_skills(source, target)
 
                 self.assertEqual(before, tree_snapshot(target))
 
@@ -220,10 +228,21 @@ class InstallSkillsTests(unittest.TestCase):
             legacy_manifest = write_legacy_install(target)
             before = tree_snapshot(target)
 
-            with patch("install_skills.os.link", side_effect=OSError("simulated manifest publish failure")):
-                with self.assertRaises(OSError):
-                    self._install_with_known_legacy(source, target, legacy_manifest)
+            with patch(
+                "install_skills._load_known_legacy_manifests",
+                return_value=[legacy_manifest],
+                create=True,
+            ), patch(
+                "install_skills.os.link",
+                side_effect=OSError("simulated manifest publish failure"),
+            ) as publish_manifest:
+                with self.assertRaises((OSError, InstallerError)):
+                    install_skills(source, target)
 
+            self.assertTrue(
+                publish_manifest.called,
+                "the failure must occur during new-manifest publication, after migration starts",
+            )
             self.assertEqual(before, tree_snapshot(target))
 
     def test_migration_race_preserves_foreign_content_and_restores_legacy(self):
@@ -232,6 +251,7 @@ class InstallSkillsTests(unittest.TestCase):
             target = Path(target_dir).resolve()
             write_suite(source, "procraft", "v0.2.0")
             legacy_manifest = write_legacy_install(target)
+            legacy_snapshot = tree_snapshot(target)
             original_rename = os.rename
 
             def race_on_procraft_publish(staged, destination):
@@ -242,16 +262,28 @@ class InstallSkillsTests(unittest.TestCase):
                     raise FileExistsError("simulated concurrent ProCraft install")
                 return original_rename(staged, destination)
 
-            with patch("install_skills.os.rename", side_effect=race_on_procraft_publish):
+            with patch(
+                "install_skills._load_known_legacy_manifests",
+                return_value=[legacy_manifest],
+                create=True,
+            ), patch("install_skills.os.rename", side_effect=race_on_procraft_publish):
                 with self.assertRaises((InstallerError, FileExistsError)):
-                    self._install_with_known_legacy(source, target, legacy_manifest)
+                    install_skills(source, target)
 
-            self.assertEqual(
-                "foreign", (target / "procraft" / "foreign.txt").read_text(encoding="utf-8")
-            )
-            self.assertTrue((target / "building-prompt-packages" / "SKILL.md").is_file())
-            self.assertTrue((target / LEGACY_MANIFEST_NAME).is_file())
+            foreign = target / "procraft" / "foreign.txt"
+            self.assertTrue(foreign.is_file(), "concurrent foreign content must survive rollback")
+            self.assertEqual("foreign", foreign.read_text(encoding="utf-8"))
+            after = tree_snapshot(target)
+            after["files"].pop("procraft/foreign.txt")
+            after["directories"].remove("procraft")
+            self.assertEqual(legacy_snapshot, after)
             self.assertFalse((target / PROCRAFT_MANIFEST_NAME).exists())
+            leaked_stages = [
+                path.name
+                for path in target.iterdir()
+                if path.is_dir() and "stage" in path.name.casefold()
+            ]
+            self.assertEqual([], leaked_stages)
 
     def test_copytree_failure_cleans_partial_destination(self):
         with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as target_dir:

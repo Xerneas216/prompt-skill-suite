@@ -5,9 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT_DIR = ROOT / "skills" / "procraft" / "scripts"
-if not SCRIPT_DIR.is_dir():
-    SCRIPT_DIR = ROOT / "skills" / "building-prompt-packages" / "scripts"
+SCRIPT_DIR = ROOT / "skills" / "building-prompt-packages" / "scripts"
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from validate_package import validate_package  # noqa: E402
@@ -30,6 +28,7 @@ class ValidatePackageTests(unittest.TestCase):
     def test_canonical_procraft_provenance_does_not_require_the_legacy_alias(self):
         package = minimal_general_package()
         modules = package["provenance"]["participating_modules"]
+        modules[modules.index("building-prompt-packages")] = "procraft"
         self.assertIn("procraft", modules)
         self.assertNotIn("building-prompt-packages", modules)
         self.assertEqual([], validate_package(package))
@@ -37,7 +36,7 @@ class ValidatePackageTests(unittest.TestCase):
     def test_legacy_entry_provenance_remains_compatible_without_procraft(self):
         package = minimal_general_package()
         modules = package["provenance"]["participating_modules"]
-        modules[modules.index("procraft")] = "building-prompt-packages"
+        self.assertIn("building-prompt-packages", modules)
         self.assertNotIn("procraft", modules)
         self.assertEqual([], validate_package(package))
 
