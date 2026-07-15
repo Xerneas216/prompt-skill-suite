@@ -55,6 +55,13 @@ class PublicDocumentationTests(unittest.TestCase):
         self.assertIn("完整模式", self.chinese)
         self.assertRegex(self.chinese, r"一个公开入口.{0,80}六个内部模块")
 
+    def test_approval_authority_belongs_to_a_user_or_authorized_party(self) -> None:
+        self.assertRegex(
+            self.english,
+            r"(?is)approval (?:itself|authority).{0,80}\buser\b.{0,40}\bauthorized party\b",
+        )
+        self.assertRegex(self.chinese, r"批准本身.{0,30}用户.{0,30}授权方")
+
     def test_readmes_link_the_official_guides_and_current_paths(self) -> None:
         required = (
             "https://developers.openai.com/api/docs/guides/prompt-guidance-gpt-5p6",

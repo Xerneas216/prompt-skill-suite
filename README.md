@@ -21,7 +21,7 @@ ProCraft carries these rules into its workflow:
 - Cut repeated instructions, conflicting rules, irrelevant examples, and tools that the task does not need.
 - Give the model room to complete safe work inside scope. Require approval for destructive actions, outside writes, purchases, or a real expansion of scope.
 - Retrieve prerequisites before acting. Run unrelated reads in parallel, keep dependent calls in order, and say what happens when a tool returns nothing useful.
-- Reserve Programmatic Tool Calling for bounded reduction work such as filtering, joining, ranking, deduplication, aggregation, batching, or repeated validation. Approval and semantic judgment stay with the model.
+- Reserve Programmatic Tool Calling for bounded reduction work such as filtering, joining, ranking, deduplication, aggregation, batching, or repeated validation. Approval handling and semantic judgment stay in the model's direct tool-calling path. Approval itself must come from the user or another authorized party.
 - Put citations beside the claims they support. Mark inference as inference, surface source conflicts, and do not fill evidence gaps with guesses.
 - Treat reasoning effort and `text.verbosity` as controls to evaluate, not decorations to turn up by default. New work starts at `medium`; higher settings need evidence that they help.
 - Verify the artifact the user will actually receive. A software prompt should demand targeted tests, honest disclosure of checks that could not run, and rendered inspection for visual work.
