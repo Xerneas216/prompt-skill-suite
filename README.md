@@ -164,7 +164,7 @@ The validator checks the Schema and semantic links: preserved explicit values, s
 
 The deterministic suite covers PromptPackage validation, deterministic rendering, provider-neutral evaluation fixtures, trigger contracts, and installer safety including trusted migration and rollback.
 
-The fresh-context dynamic trigger gate is separate from deterministic verification. Until it is actually executed with evidence, its v0.3.0 status remains `not_run`. Passing unit tests does not convert that status into a model-quality claim.
+The fresh-context dynamic trigger gate is separate from deterministic verification. The recorded v0.3.0 run passed: implicit Prompt requests `5/5`, direct-task negatives `5/5`, and explicit `$procraft` `1/1`. Per-case routing evidence is in `evals/results/procraft-v0.3.0-trigger-run.json`. This proves the tested routing boundary; it is not a general model-quality claim.
 
 ## Repository map
 

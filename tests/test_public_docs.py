@@ -84,6 +84,9 @@ class PublicDocumentationTests(unittest.TestCase):
                 self.assertRegex(readme, r"Python 3\.8.{0,20}3\.12")
                 self.assertIn("dist\\procraft-v0.3.0.zip", readme)
                 self.assertIn("dist\\procraft-v0.3.0.zip.sha256", readme)
+                self.assertIn("evals/results/procraft-v0.3.0-trigger-run.json", readme)
+                self.assertIn("5/5", readme)
+                self.assertIn("1/1", readme)
                 self.assertRegex(readme, r"(?i)manifest v2|v2 manifest|清单 v2|v2 清单")
                 self.assertRegex(readme, r"(?i)external runtime|外部运行环境")
                 self.assertRegex(readme, r"(?i)clean install|全新安装|干净安装")
@@ -104,9 +107,13 @@ class PublicDocumentationTests(unittest.TestCase):
             "external runtime",
             "verification",
             "supersedes",
+            "evals/results/procraft-v0.3.0-trigger-run.json",
+            "5/5",
+            "1/1",
         ):
             with self.subTest(value=value):
                 self.assertIn(value, content)
+        self.assertNotIn("remains `not_run`", content)
 
     def test_readmes_avoid_disclaimers_stale_paths_and_dash_tells(self) -> None:
         forbidden = re.compile(
