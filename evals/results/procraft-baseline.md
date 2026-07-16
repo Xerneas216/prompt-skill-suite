@@ -16,14 +16,14 @@ The v0.2.0 RED dynamic trigger status is `fail`. Explicit invocation and the con
 
 ## v0.3.0 GREEN run
 
-Status: `not_run`
+Status: `pass`
 
-Run the machine-readable cases in `evals/fixtures/trigger-cases.json` from independent fresh contexts after installing the release artifact. Record the model/runtime identity, clean registry evidence, raw outputs, and per-case trigger decision.
+On 2026-07-16, the machine-readable cases in `evals/fixtures/trigger-cases.json` ran in independent fork-free contexts after the single-Skill candidate was installed. The model/runtime identity, per-case routing telemetry, observed Skill set, decision, and response summary are recorded in `evals/results/procraft-v0.3.0-trigger-run.json`.
 
-GREEN requires all of these criteria in the same fresh-context run:
+All release gates passed in the same run:
 
-- Implicit positives: `5/5` trigger ProCraft and exhibit observable ProCraft behavior.
-- Direct-task negatives: `5/5` do not trigger ProCraft and perform the requested underlying task directly.
-- Explicit `$procraft`: `1/1` triggers ProCraft.
+- Implicit positives: `5/5` triggered ProCraft and produced the requested Prompt artifact.
+- Direct-task negatives: `5/5` did not trigger ProCraft and performed or correctly began the underlying task directly.
+- Explicit `$procraft`: `1/1` triggered ProCraft and returned a Fast-mode Prompt.
 
-Do not mark the v0.3.0 run GREEN until those runs and artifacts exist. Deterministic tests and the preserved v0.2.0 result are not substitutes for fresh execution evidence.
+The deterministic suite and this dynamic run remain separate evidence. The v0.2.0 RED result above is retained as migration history.

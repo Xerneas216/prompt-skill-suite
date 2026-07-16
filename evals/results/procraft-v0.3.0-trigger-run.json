@@ -1,0 +1,117 @@
+{
+  "run_id": "procraft-v0.3.0-fresh-context-2026-07-16",
+  "run_date": "2026-07-16",
+  "timezone": "Asia/Shanghai",
+  "status": "pass",
+  "candidate_id": "procraft-v0.3.0",
+  "candidate_ref": "20738267126f4c2c8e389bf6436de9dc89e0b45d",
+  "runtime": "Codex desktop fresh-context subagents",
+  "model": "GPT-5 (session-provided identity)",
+  "method": "Each case ran in an independent fork-free context after installing the single-Skill candidate. The probe reported only Skills it actually read and applied.",
+  "gates": {
+    "implicit_positive": "5/5",
+    "direct_task_negative": "5/5",
+    "explicit": "1/1"
+  },
+  "cases": [
+    {
+      "case_id": "implicit-positive-zh-prompt",
+      "expected_trigger": true,
+      "procraft_triggered": true,
+      "used_skills": ["procraft"],
+      "outcome": "pass",
+      "evidence": "ROUTING_TELEMETRY: used_skills=[procraft]",
+      "response_summary": "Returned a reusable Chinese interview-to-evidence-backed-requirements prompt with variables and assumptions."
+    },
+    {
+      "case_id": "implicit-positive-en-prompt",
+      "expected_trigger": true,
+      "procraft_triggered": true,
+      "used_skills": ["procraft"],
+      "outcome": "pass",
+      "evidence": "ROUTING_TELEMETRY: used_skills=[procraft]",
+      "response_summary": "Returned a reusable meeting-notes-to-action-register prompt with variables and assumptions."
+    },
+    {
+      "case_id": "implicit-positive-media-prompt",
+      "expected_trigger": true,
+      "procraft_triggered": true,
+      "used_skills": ["brainstorming", "procraft"],
+      "outcome": "pass",
+      "evidence": "ROUTING_TELEMETRY: used_skills=[brainstorming, procraft]",
+      "response_summary": "Returned the requested documentary-style lunar-greenhouse image prompt rather than generating an image."
+    },
+    {
+      "case_id": "implicit-positive-agent-instructions",
+      "expected_trigger": true,
+      "procraft_triggered": true,
+      "used_skills": ["brainstorming", "procraft"],
+      "outcome": "pass",
+      "evidence": "ROUTING_TELEMETRY: used_skills=[brainstorming, procraft]",
+      "response_summary": "Returned system and developer instructions for a read-only compliance research agent with explicit runtime boundaries."
+    },
+    {
+      "case_id": "implicit-positive-improve-prompt",
+      "expected_trigger": true,
+      "procraft_triggered": true,
+      "used_skills": ["procraft"],
+      "outcome": "pass",
+      "evidence": "ROUTING_TELEMETRY: used_skills=[procraft]",
+      "response_summary": "Returned an improved incident-summary prompt preserving dates and claim-level citations."
+    },
+    {
+      "case_id": "direct-negative-email",
+      "expected_trigger": false,
+      "procraft_triggered": false,
+      "used_skills": [],
+      "outcome": "pass",
+      "evidence": "ROUTING_TELEMETRY: used_skills=[]",
+      "response_summary": "Wrote the rescheduling email directly."
+    },
+    {
+      "case_id": "direct-negative-summary",
+      "expected_trigger": false,
+      "procraft_triggered": false,
+      "used_skills": [],
+      "outcome": "pass",
+      "evidence": "ROUTING_TELEMETRY: used_skills=[]",
+      "response_summary": "Requested the missing meeting notes directly."
+    },
+    {
+      "case_id": "direct-negative-research",
+      "expected_trigger": false,
+      "procraft_triggered": false,
+      "used_skills": [],
+      "outcome": "pass",
+      "evidence": "ROUTING_TELEMETRY: used_skills=[]",
+      "response_summary": "Performed current static-site-hosting research directly with source links."
+    },
+    {
+      "case_id": "direct-negative-code-fix",
+      "expected_trigger": false,
+      "procraft_triggered": false,
+      "used_skills": ["systematic-debugging", "test-driven-development"],
+      "outcome": "pass",
+      "evidence": "ROUTING_TELEMETRY: used_skills=[systematic-debugging, test-driven-development]",
+      "response_summary": "Requested parser code and a reproducing boundary case, routing to debugging and TDD instead of ProCraft."
+    },
+    {
+      "case_id": "direct-negative-image",
+      "expected_trigger": false,
+      "procraft_triggered": false,
+      "used_skills": ["brainstorming", "imagegen"],
+      "outcome": "pass",
+      "evidence": "IMAGE_CASE_TELEMETRY: used_skills=[brainstorming, imagegen]",
+      "response_summary": "Generated the requested lunar-greenhouse image rather than returning a Prompt artifact."
+    },
+    {
+      "case_id": "explicit-procraft",
+      "expected_trigger": true,
+      "procraft_triggered": true,
+      "used_skills": ["procraft"],
+      "outcome": "pass",
+      "evidence": "ROUTING_TELEMETRY: used_skills=[procraft]",
+      "response_summary": "Explicit invocation returned a concise Fast-mode support-ticket classification prompt."
+    }
+  ]
+}

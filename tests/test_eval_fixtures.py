@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "evals" / "fixtures" / "representative-cases.json"
 TRIGGER_FIXTURE = ROOT / "evals" / "fixtures" / "trigger-cases.json"
+TRIGGER_RESULT = ROOT / "evals" / "results" / "procraft-v0.3.0-trigger-run.json"
 
 
 class EvaluationFixtureTests(unittest.TestCase):
@@ -69,6 +70,27 @@ class EvaluationFixtureTests(unittest.TestCase):
                 self.assertEqual({"case_id", "kind", "coverage", "prompt", "expected_trigger"}, set(case))
         explicit = next(case for case in data["cases"] if case["kind"] == "explicit")
         self.assertIn("$procraft", explicit["prompt"])
+
+    def test_v030_trigger_result_passes_every_release_gate(self):
+        self.assertTrue(TRIGGER_RESULT.is_file())
+        data = json.loads(TRIGGER_RESULT.read_text(encoding="utf-8"))
+        self.assertEqual("pass", data["status"])
+        self.assertEqual("procraft-v0.3.0", data["candidate_id"])
+        self.assertEqual(11, len(data["cases"]))
+        self.assertEqual(
+            {case["case_id"] for case in json.loads(TRIGGER_FIXTURE.read_text(encoding="utf-8"))["cases"]},
+            {case["case_id"] for case in data["cases"]},
+        )
+        self.assertEqual(
+            {"implicit_positive": "5/5", "direct_task_negative": "5/5", "explicit": "1/1"},
+            data["gates"],
+        )
+        for case in data["cases"]:
+            with self.subTest(case_id=case["case_id"]):
+                self.assertEqual(case["expected_trigger"], case["procraft_triggered"])
+                self.assertEqual("pass", case["outcome"])
+                self.assertIsInstance(case["used_skills"], list)
+                self.assertTrue(case["evidence"])
 
 
 if __name__ == "__main__":
