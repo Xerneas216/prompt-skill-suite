@@ -17,9 +17,26 @@ class DistributionMetadataTests(unittest.TestCase):
         path = ROOT / ".gitattributes"
         self.assertTrue(path.is_file())
         attributes = path.read_text(encoding="utf-8").splitlines()
-        for pattern in ("*.md", "*.yaml", "*.yml", "*.json", "*.py", "*.txt"):
+        for pattern in (
+            ".gitattributes",
+            "*.md",
+            "*.yaml",
+            "*.yml",
+            "*.json",
+            "*.py",
+            "*.txt",
+            "*.sha256",
+        ):
             with self.subTest(pattern=pattern):
                 self.assertIn(f"{pattern} text eol=lf", attributes)
+
+    def test_distributed_skill_text_is_physically_lf_only(self):
+        skill_root = ROOT / "skills" / "procraft"
+        text_suffixes = {".md", ".yaml", ".yml", ".json", ".py", ".txt"}
+        for path in sorted(skill_root.rglob("*")):
+            if path.is_file() and path.suffix in text_suffixes:
+                with self.subTest(path=path.relative_to(ROOT).as_posix()):
+                    self.assertNotIn(b"\r", path.read_bytes())
 
     def test_ci_covers_supported_platforms_and_python_versions(self):
         workflow = ROOT / ".github" / "workflows" / "ci.yml"
@@ -50,6 +67,7 @@ class DistributionMetadataTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertIn(value, content)
         self.assertNotIn("- run: python tools/build_release.py\n", content)
+        self.assertIn("push:\n    branches: [main]", content)
 
 
 if __name__ == "__main__":
