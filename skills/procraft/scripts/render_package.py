@@ -77,7 +77,8 @@ def main(argv: list[str] | None = None) -> int:
             package = json.load(handle)
         rendered = render_package(package)
         if args.output:
-            args.output.write_text(rendered, encoding="utf-8", newline="\n")
+            with args.output.open("w", encoding="utf-8", newline="\n") as handle:
+                handle.write(rendered)
         else:
             sys.stdout.write(rendered)
     except (OSError, json.JSONDecodeError, ValueError) as exc:
