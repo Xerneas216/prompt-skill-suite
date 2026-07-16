@@ -70,6 +70,16 @@ class ReleaseBuildTests(unittest.TestCase):
         self.assertEqual(first_archive, second_archive)
         self.assertEqual(first_checksum, second_checksum)
 
+    def test_all_members_use_the_portable_stored_method(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output_dir = Path(temporary)
+            self.build(output_dir)
+            with zipfile.ZipFile(output_dir / ARCHIVE_NAME) as release:
+                self.assertEqual(
+                    {zipfile.ZIP_STORED},
+                    {member.compress_type for member in release.infolist()},
+                )
+
     def test_checksum_writer_is_python_38_compatible(self) -> None:
         source = BUILD_SCRIPT.read_text(encoding="utf-8")
         self.assertNotIn("checksum_path.write_text", source)

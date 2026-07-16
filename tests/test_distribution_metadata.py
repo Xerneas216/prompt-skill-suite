@@ -37,6 +37,20 @@ class DistributionMetadataTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertIn(value, content)
 
+    def test_ci_rebuilds_outside_dist_and_checks_the_committed_checksum(self):
+        workflow = ROOT / ".github" / "workflows" / "ci.yml"
+        content = workflow.read_text(encoding="utf-8")
+        for value in (
+            "python tools/build_release.py --output-dir build-release",
+            "build-release/procraft-v0.3.0.zip",
+            "dist/procraft-v0.3.0.zip.sha256",
+            "hashlib.sha256",
+            "if actual != expected",
+        ):
+            with self.subTest(value=value):
+                self.assertIn(value, content)
+        self.assertNotIn("- run: python tools/build_release.py\n", content)
+
 
 if __name__ == "__main__":
     unittest.main()

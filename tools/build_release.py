@@ -23,7 +23,7 @@ FILE_MODE = 0o100644 << 16
 
 def _zip_info(name: str) -> zipfile.ZipInfo:
     info = zipfile.ZipInfo(name, FIXED_TIMESTAMP)
-    info.compress_type = zipfile.ZIP_DEFLATED
+    info.compress_type = zipfile.ZIP_STORED
     info.create_system = 3
     info.external_attr = FILE_MODE
     return info
@@ -54,16 +54,11 @@ def build_release(output_dir: Path) -> tuple[Path, Path]:
         key=lambda path: path.relative_to(skill_root).as_posix(),
     )
 
-    with zipfile.ZipFile(
-        archive_path,
-        mode="w",
-        compression=zipfile.ZIP_DEFLATED,
-        compresslevel=9,
-    ) as archive:
-        archive.writestr(_zip_info(".procraft-manifest.json"), manifest_bytes, compresslevel=9)
+    with zipfile.ZipFile(archive_path, mode="w") as archive:
+        archive.writestr(_zip_info(".procraft-manifest.json"), manifest_bytes)
         for path in source_files:
             name = f"procraft/{path.relative_to(skill_root).as_posix()}"
-            archive.writestr(_zip_info(name), path.read_bytes(), compresslevel=9)
+            archive.writestr(_zip_info(name), path.read_bytes())
 
     digest = hashlib.sha256(archive_path.read_bytes()).hexdigest()
     with checksum_path.open("w", encoding="ascii", newline="\n") as checksum_file:
