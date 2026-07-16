@@ -21,6 +21,22 @@ class DistributionMetadataTests(unittest.TestCase):
             with self.subTest(pattern=pattern):
                 self.assertIn(f"{pattern} text eol=lf", attributes)
 
+    def test_ci_covers_supported_platforms_and_python_versions(self):
+        workflow = ROOT / ".github" / "workflows" / "ci.yml"
+        self.assertTrue(workflow.is_file())
+        content = workflow.read_text(encoding="utf-8")
+        for value in (
+            "ubuntu-latest",
+            "windows-latest",
+            '"3.8"',
+            '"3.12"',
+            "pip install -r requirements-dev.txt",
+            "python -m unittest discover -s tests -v",
+            "python tools/build_release.py",
+        ):
+            with self.subTest(value=value):
+                self.assertIn(value, content)
+
 
 if __name__ == "__main__":
     unittest.main()

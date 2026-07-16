@@ -4,7 +4,7 @@
 
 ProCraft turns a rough idea for an AI prompt into instructions you can paste into a model or agent and use. Small requests stay small. Production workflows get the contracts, tool rules, validation, and evaluation records they need.
 
-It is built for Codex and tuned around GPT-5.6. The current project release is `v0.2.0`; the packaged artifact format remains PromptPackage Schema v1.0.
+It is built for Codex and tuned around GPT-5.6. The current project release is `v0.3.0`; the packaged artifact format remains PromptPackage Schema v1.0.
 
 ## Where it came from
 
@@ -61,7 +61,7 @@ If the request is unclear, ProCraft returns a useful Fast mode result and offers
 
 ## How the pieces fit
 
-The project has one public gateway and six internal specialists. Most users only need `procraft`; the other modules join when that workflow reaches their stage.
+The project installs one discoverable Skill, `procraft`. Its six internal reference modules join only when that workflow reaches their stage; they are not separately discoverable Skills.
 
 | Module | Job inside the workflow |
 |---|---|
@@ -91,7 +91,7 @@ Request
 
 ## Install it 🚀
 
-The documented commands use Windows PowerShell, Python 3, and Git.
+The documented commands use Windows PowerShell, Git, and an external runtime environment with Python 3.8 through 3.12. Python and its dependencies are not bundled in the Skill or release ZIP.
 
 ```powershell
 git clone https://github.com/Xerneas216/ProCraft.git
@@ -113,9 +113,20 @@ Then install into `%USERPROFILE%\.codex\skills`:
 .\.venv\Scripts\python.exe install_skills.py
 ```
 
-The installer is intentionally clean-install only. It refuses an existing ProCraft manifest or any same-name Skill directory, stages the new files, verifies their SHA-256 hashes, and rolls back unchanged files if publication fails.
+The installer supports clean install only. It refuses an existing ProCraft manifest or any same-name Skill directory, stages the new files, verifies their SHA-256 hashes, and rolls back unchanged files if publication fails.
 
-The installed state is recorded in `.procraft-manifest.json`. Start a new Codex task after installation so local Skill discovery refreshes.
+The installed state is recorded in the manifest v2 file `.procraft-manifest.json`. Start a new Codex task after installation so local Skill discovery refreshes.
+
+Build the deterministic v0.3.0 release ZIP and verify its published checksum:
+
+```powershell
+.\.venv\Scripts\python.exe tools\build_release.py
+$expected = (Get-Content dist\procraft-v0.3.0.zip.sha256).Split()[0]
+$actual = (Get-FileHash -Algorithm SHA256 dist\procraft-v0.3.0.zip).Hash.ToLowerInvariant()
+if ($actual -ne $expected) { throw "Release ZIP checksum mismatch" }
+```
+
+The ZIP contains only `.procraft-manifest.json` and the installed `procraft` tree. Install from a clean checkout or verified release artifact; v0.3.0 does not overwrite an existing installation.
 
 ## Use it
 
@@ -153,17 +164,17 @@ The validator checks the Schema and semantic links: preserved explicit values, s
 
 The deterministic suite covers PromptPackage validation, deterministic rendering, provider-neutral evaluation fixtures, trigger contracts, and installer safety including trusted migration and rollback.
 
-Fresh-context dynamic evaluation is a separate gate. Until it is actually executed with evidence, its status remains `not_run`. Passing unit tests does not convert that status into a model-quality claim.
+The fresh-context dynamic trigger gate is separate from deterministic verification. Until it is actually executed with evidence, its v0.3.0 status remains `not_run`. Passing unit tests does not convert that status into a model-quality claim.
 
 ## Repository map
 
 ```text
 ProCraft/
-├── skills/                 # Public gateway and internal specialists
+├── skills/procraft/        # One discoverable Skill and its internal references
 ├── evals/                  # Representative cases and evidence records
 ├── tests/                  # Deterministic unittest suite
-├── tools/                  # Verified installer and migration anchors
-├── docs/superpowers/       # Historical design and implementation records
+├── tools/                  # Verified installer and release builder
+├── dist/                   # Reproducible ZIP and SHA-256 sidecar after a build
 ├── install_skills.py       # Installation entry point
 ├── requirements.txt        # Runtime dependency
 └── requirements-dev.txt    # Development dependencies

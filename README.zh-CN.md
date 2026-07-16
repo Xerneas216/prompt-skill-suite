@@ -4,7 +4,7 @@
 
 ProCraft 可以把一个模糊的 Prompt 想法，整理成能直接交给模型或 Agent 使用的指令。简单需求直接给成品，生产级工作流再进入任务契约、工具规则、校验和评测。
 
-它为 Codex 设计，并围绕 GPT-5.6 调校。当前项目版本是 `v0.2.0`，产物格式继续使用 PromptPackage Schema v1.0。
+它为 Codex 设计，并围绕 GPT-5.6 调校。当前项目版本是 `v0.3.0`，产物格式继续使用 PromptPackage Schema v1.0。
 
 ## 这个项目从哪里来
 
@@ -61,7 +61,7 @@ ProCraft 看的是用户要交付什么。只有用户明确想要 Prompt、系�
 
 ## 内部怎么配合
 
-项目采用一个公开入口和六个内部模块。多数用户只需要 `procraft`，其余模块会在流程走到对应阶段时加入。
+项目只安装一个可发现的 Skill：`procraft`。六个内部参考模块只在流程进入对应阶段时加入，它们不是可单独发现的 Skills。
 
 | 模块 | 在工作流中的职责 |
 |---|---|
@@ -91,7 +91,7 @@ ProCraft 看的是用户要交付什么。只有用户明确想要 Prompt、系�
 
 ## 安装 🚀
 
-下面的命令适用于 Windows PowerShell，并需要 Python 3 和 Git。
+下面的命令适用于 Windows PowerShell、Git，以及安装在外部运行环境中的 Python 3.8 至 3.12。Python 及其依赖不会打包进 Skill 或发布 ZIP。
 
 ```powershell
 git clone https://github.com/Xerneas216/ProCraft.git
@@ -115,7 +115,18 @@ py -3 -m venv .venv
 
 安装器只负责全新安装。遇到现有 ProCraft 清单或任何同名 Skill 目录时会直接停止；新文件会先进入暂存区并校验 SHA-256，发布失败时只回滚仍保持原样的文件。
 
-安装状态记录在 `.procraft-manifest.json`。安装完成后新建一个 Codex 任务，让本地 Skill 发现机制刷新。
+安装状态记录在 v2 清单 `.procraft-manifest.json` 中。安装完成后新建一个 Codex 任务，让本地 Skill 发现机制刷新。
+
+构建确定性的 v0.3.0 发布 ZIP，并核对发布的 SHA-256：
+
+```powershell
+.\.venv\Scripts\python.exe tools\build_release.py
+$expected = (Get-Content dist\procraft-v0.3.0.zip.sha256).Split()[0]
+$actual = (Get-FileHash -Algorithm SHA256 dist\procraft-v0.3.0.zip).Hash.ToLowerInvariant()
+if ($actual -ne $expected) { throw "发布 ZIP 校验和不匹配" }
+```
+
+ZIP 只包含 `.procraft-manifest.json` 和安装后的 `procraft` 目录树。请从干净 checkout 或已验证的发布产物进行全新安装；v0.3.0 不会覆盖现有安装。
 
 ## 开始使用
 
@@ -153,17 +164,17 @@ py -3 -m venv .venv
 
 确定性测试覆盖 PromptPackage 校验、Markdown 确定性渲染、与供应商无关的评测夹具、触发契约，以及包含可信迁移与回滚在内的安装器安全行为。
 
-新鲜上下文动态评测是另一道门槛。没有实际执行证据时，其状态必须保持 `not_run`。单元测试通过不能把它变成模型质量已经验证的结论。
+新鲜上下文的动态触发门禁独立于确定性验证。没有实际执行证据时，v0.3.0 状态必须保持 `not_run`。单元测试通过不能把它变成模型质量已经验证的结论。
 
 ## 仓库结构
 
 ```text
 ProCraft/
-├── skills/                 # 公开入口和内部模块
+├── skills/procraft/        # 一个可发现的 Skill 及其内部参考
 ├── evals/                  # 代表性用例和证据记录
 ├── tests/                  # 确定性 unittest 测试
-├── tools/                  # 安装器和迁移信任锚
-├── docs/superpowers/       # 历史设计与实施记录
+├── tools/                  # 已验证的安装器和发布构建器
+├── dist/                   # 构建后可复现的 ZIP 与 SHA-256 文件
 ├── install_skills.py       # 安装入口
 ├── requirements.txt        # 运行依赖
 └── requirements-dev.txt    # 开发依赖
