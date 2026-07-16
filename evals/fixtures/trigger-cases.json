@@ -1,0 +1,84 @@
+{
+  "fixture_version": "1.0",
+  "status": "not_run",
+  "candidate_id": "procraft-v0.3.0",
+  "cases": [
+    {
+      "case_id": "implicit-positive-zh-prompt",
+      "kind": "implicit_positive",
+      "coverage": "chinese_prompt_creation",
+      "prompt": "帮我写一个可复用的提示词，把客户访谈整理成带证据的需求清单。",
+      "expected_trigger": true
+    },
+    {
+      "case_id": "implicit-positive-en-prompt",
+      "kind": "implicit_positive",
+      "coverage": "english_prompt_creation",
+      "prompt": "Create a reusable prompt that turns meeting notes into an action register.",
+      "expected_trigger": true
+    },
+    {
+      "case_id": "implicit-positive-media-prompt",
+      "kind": "implicit_positive",
+      "coverage": "image_media_prompt",
+      "prompt": "Write an image-generation prompt for a quiet lunar greenhouse in a documentary style.",
+      "expected_trigger": true
+    },
+    {
+      "case_id": "implicit-positive-agent-instructions",
+      "kind": "implicit_positive",
+      "coverage": "agent_system_instruction",
+      "prompt": "Design the system and developer instructions for a read-only compliance research agent.",
+      "expected_trigger": true
+    },
+    {
+      "case_id": "implicit-positive-improve-prompt",
+      "kind": "implicit_positive",
+      "coverage": "prompt_improvement",
+      "prompt": "Improve this prompt so it preserves dates and cites each factual claim: Summarize the incident.",
+      "expected_trigger": true
+    },
+    {
+      "case_id": "direct-negative-email",
+      "kind": "direct_task_negative",
+      "coverage": "direct_email",
+      "prompt": "Write an email moving Friday's planning meeting to Monday.",
+      "expected_trigger": false
+    },
+    {
+      "case_id": "direct-negative-summary",
+      "kind": "direct_task_negative",
+      "coverage": "direct_summarization",
+      "prompt": "Summarize these meeting notes in five bullets.",
+      "expected_trigger": false
+    },
+    {
+      "case_id": "direct-negative-research",
+      "kind": "direct_task_negative",
+      "coverage": "direct_research",
+      "prompt": "Research the current options for hosting a static website.",
+      "expected_trigger": false
+    },
+    {
+      "case_id": "direct-negative-code-fix",
+      "kind": "direct_task_negative",
+      "coverage": "direct_code_fix",
+      "prompt": "Fix the off-by-one error in this parser.",
+      "expected_trigger": false
+    },
+    {
+      "case_id": "direct-negative-image",
+      "kind": "direct_task_negative",
+      "coverage": "direct_image_generation",
+      "prompt": "Generate an image of a quiet lunar greenhouse.",
+      "expected_trigger": false
+    },
+    {
+      "case_id": "explicit-procraft",
+      "kind": "explicit",
+      "coverage": "explicit_procraft",
+      "prompt": "$procraft Create a concise prompt for classifying support tickets.",
+      "expected_trigger": true
+    }
+  ]
+}

@@ -1,4 +1,0 @@
-interface:
-  display_name: "ProCraft · Evaluate"
-  short_description: "Compare prompt candidates with evidence"
-  default_prompt: "In an active ProCraft workflow after a passing static review, use $evaluating-prompt-packages for evaluation and baseline comparison."

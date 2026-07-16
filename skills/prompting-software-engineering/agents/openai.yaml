@@ -1,4 +1,0 @@
-interface:
-  display_name: "ProCraft · Software"
-  short_description: "Build prompts for verified software work"
-  default_prompt: "In an active ProCraft workflow with a ready contract, use $prompting-software-engineering for this software prompt."

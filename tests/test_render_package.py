@@ -12,6 +12,11 @@ from tests.package_factory import full_agent_package, minimal_general_package
 
 
 class RenderPackageTests(unittest.TestCase):
+    def test_cli_output_uses_python_38_compatible_lf_writer(self):
+        source = (SCRIPT_DIR / "render_package.py").read_text(encoding="utf-8")
+        self.assertIn('args.output.open("w", encoding="utf-8", newline="\\n")', source)
+        self.assertNotIn("args.output.write_text", source)
+
     def test_render_is_deterministic(self):
         package = full_agent_package()
         self.assertEqual(render_package(package), render_package(package))

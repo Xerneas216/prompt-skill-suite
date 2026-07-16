@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import json
 import re
 import unittest
 from pathlib import Path
@@ -6,20 +9,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "skills"
 
-INTERNAL_SKILLS = {
-    "defining-prompt-contracts": ("ProCraft · Contract", ("contract",)),
-    "prompting-general-tasks": ("ProCraft · General", ("ready contract", "general")),
-    "prompting-tool-agents": ("ProCraft · Agent", ("ready contract", "tool")),
-    "prompting-software-engineering": (
-        "ProCraft · Software",
-        ("ready contract", "software"),
-    ),
-    "reviewing-prompt-packages": ("ProCraft · Review", ("candidate", "review")),
-    "evaluating-prompt-packages": (
-        "ProCraft · Evaluate",
-        ("passing static review", "evaluation"),
-    ),
-}
+INTERNAL_MODULES = (
+    "defining-prompt-contracts",
+    "prompting-general-tasks",
+    "prompting-tool-agents",
+    "prompting-software-engineering",
+    "reviewing-prompt-packages",
+    "evaluating-prompt-packages",
+)
 
 
 def _frontmatter(skill_file: Path) -> dict[str, str]:
@@ -40,7 +37,7 @@ def _yaml_value(path: Path, key: str) -> str:
     match = re.search(rf"^\s*{re.escape(key)}:\s*[\"']?(.*?)[\"']?\s*$", text, re.MULTILINE)
     if not match:
         raise AssertionError(f"Missing {key} in {path}")
-    return match.group(1).rstrip('"\'')
+    return match.group(1).rstrip("\"'")
 
 
 def _section(text: str, heading: str) -> str:
@@ -64,28 +61,37 @@ class ProCraftSkillContractTests(unittest.TestCase):
     def test_procraft_is_the_public_entry_directory(self):
         self.assertTrue((SKILLS / "procraft" / "SKILL.md").is_file())
 
+    def test_distribution_exposes_exactly_one_skill_directory(self):
+        skill_files = sorted(path.relative_to(SKILLS).as_posix() for path in SKILLS.glob("*/SKILL.md"))
+        self.assertEqual(["procraft/SKILL.md"], skill_files)
+        for module in INTERNAL_MODULES:
+            with self.subTest(module=module):
+                self.assertFalse((SKILLS / module).exists())
+
+    def test_internal_stage_instructions_and_references_are_merged(self):
+        for module in INTERNAL_MODULES:
+            with self.subTest(module=module):
+                merged = SKILLS / "procraft" / "references" / f"{module}.md"
+                self.assertTrue(merged.is_file(), merged)
+                content = merged.read_text(encoding="utf-8")
+                self.assertIn("## Stage instructions", content)
+                self.assertIn("## Detailed reference", content)
+
     def test_procraft_frontmatter_covers_positive_and_negative_trigger_boundaries(self):
-        path = SKILLS / "procraft" / "SKILL.md"
-        if not path.is_file():
-            self.fail("skills/procraft/SKILL.md must exist as the canonical entry")
-        metadata = _frontmatter(path)
+        metadata = _frontmatter(SKILLS / "procraft" / "SKILL.md")
         self.assertEqual("procraft", metadata.get("name"))
         description = metadata.get("description", "").casefold()
-        for phrase in (
-            "prompt",
-            "提示词",
-            "系统指令",
-            "system",
-            "developer",
-            "user",
-            "agent",
-            "tool",
-            "structured output",
-            "reusable",
-        ):
+        for phrase in ("prompt", "提示词", "llm", "agent", "image", "video", "audio"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, description)
-        for ordinary_task in ("writing", "research", "programming"):
+        for ordinary_task in (
+            "writing",
+            "research",
+            "coding",
+            "summarization",
+            "email",
+            "image generation",
+        ):
             with self.subTest(ordinary_task=ordinary_task):
                 self.assertIn(ordinary_task, description)
         self.assertRegex(description, r"(?:do not use|only (?:use|when))")
@@ -95,25 +101,21 @@ class ProCraftSkillContractTests(unittest.TestCase):
         if not path.is_file():
             self.fail("skills/procraft/agents/openai.yaml must exist")
         self.assertEqual("ProCraft", _yaml_value(path, "display_name"))
-        default_prompt = _yaml_value(path, "default_prompt")
-        self.assertIn("$procraft", default_prompt)
+        self.assertIn("$procraft", _yaml_value(path, "default_prompt"))
 
-    def test_internal_skills_are_stage_gated_inside_the_procraft_workflow(self):
-        for skill_name, (display_name, stage_terms) in INTERNAL_SKILLS.items():
-            with self.subTest(skill=skill_name):
-                skill_file = SKILLS / skill_name / "SKILL.md"
-                metadata = _frontmatter(skill_file)
-                description = metadata.get("description", "").casefold()
-                self.assertIn("procraft workflow", description)
-                self.assertIn("only", description)
-                for term in stage_terms:
-                    self.assertIn(term, description)
+    def test_full_mode_reads_merged_references_directly(self):
+        full = _section(self._procraft_text(), "Full mode")
+        for module in INTERNAL_MODULES:
+            with self.subTest(module=module):
+                self.assertIn(f"](references/{module}.md)", full)
 
-                yaml_file = SKILLS / skill_name / "agents" / "openai.yaml"
-                self.assertEqual(display_name, _yaml_value(yaml_file, "display_name"))
-                default_prompt = _yaml_value(yaml_file, "default_prompt").casefold()
-                self.assertIn("procraft workflow", default_prompt)
-                self.assertIn(f"${skill_name}", default_prompt)
+    def test_promptpackage_v1_keeps_logical_participating_module_names(self):
+        schema_path = SKILLS / "procraft" / "references" / "prompt-package.schema.json"
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        modules = schema["$defs"]["provenance"]["properties"]["participating_modules"]["items"][
+            "enum"
+        ]
+        self.assertEqual(["procraft", *INTERNAL_MODULES], modules)
 
     def test_mode_priority_is_explicit_then_full_then_fast(self):
         selection = _section(self._procraft_text(), "Mode selection")

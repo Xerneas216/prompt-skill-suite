@@ -1,4 +1,0 @@
-interface:
-  display_name: "ProCraft · Contract"
-  short_description: "Turn briefs into explicit prompt contracts"
-  default_prompt: "In an active ProCraft workflow, use $defining-prompt-contracts to normalize or verify the prompt contract for this brief."

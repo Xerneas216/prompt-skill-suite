@@ -15,15 +15,10 @@ from pathlib import Path
 
 MANIFEST_NAME = ".procraft-manifest.json"
 STAGING_PREFIX = ".procraft-stage-"
-PROCRAFT_SKILLS = [
-    "procraft",
-    "defining-prompt-contracts",
-    "prompting-general-tasks",
-    "prompting-tool-agents",
-    "prompting-software-engineering",
-    "reviewing-prompt-packages",
-    "evaluating-prompt-packages",
-]
+DISTRIBUTION = "procraft"
+PACKAGE_VERSION = "0.3.0"
+REPOSITORY = "https://github.com/Xerneas216/ProCraft"
+PROCRAFT_SKILLS = ["procraft"]
 
 
 class InstallerError(RuntimeError):
@@ -40,9 +35,9 @@ def _skill_dirs(source: Path) -> list[Path]:
     if missing_metadata:
         raise InstallerError("Missing agents/openai.yaml: " + ", ".join(missing_metadata))
     by_name = {path.name: path for path in skills}
-    if set(by_name) == set(PROCRAFT_SKILLS):
-        return [by_name[name] for name in PROCRAFT_SKILLS]
-    return skills
+    if set(by_name) != set(PROCRAFT_SKILLS):
+        raise InstallerError("Source must contain exactly the procraft skill directory")
+    return [by_name[name] for name in PROCRAFT_SKILLS]
 
 
 def _source_files(skills: list[Path]) -> list[tuple[str, Path]]:
@@ -147,10 +142,18 @@ def _cleanup_staging_root(staging_root: Path) -> None:
         return
 
 
-def install_skills(source: Path, target: Path, dry_run: bool = False) -> dict:
-    """Install a new verified ProCraft suite without overwriting existing skills."""
+def install_skills(
+    source: Path,
+    target: Path,
+    dry_run: bool = False,
+    source_ref: str = "local",
+) -> dict:
+    """Install a verified ProCraft distribution without overwriting existing skills."""
     source = source.resolve()
     target = target.resolve()
+    source_ref = source_ref.strip()
+    if not source_ref:
+        raise InstallerError("Source ref must be a non-empty repository tag or commit")
     skills = _skill_dirs(source)
     skill_names = [skill.name for skill in skills]
     source_files = _source_files(skills)
@@ -164,9 +167,11 @@ def install_skills(source: Path, target: Path, dry_run: bool = False) -> dict:
         raise InstallerError("Refusing to overwrite existing skills: " + ", ".join(conflicts))
 
     manifest = {
-        "manifest_version": "1.0",
+        "manifest_version": "2.0",
+        "distribution": DISTRIBUTION,
+        "package_version": PACKAGE_VERSION,
+        "source": {"repository": REPOSITORY, "ref": source_ref},
         "mode": "clean_install",
-        "source": str(source),
         "skills": skill_names,
         "files": expected_hashes,
     }
@@ -246,10 +251,20 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=Path(__file__).resolve().parents[1] / "skills")
     parser.add_argument("--target", type=Path, default=Path.home() / ".codex" / "skills")
+    parser.add_argument(
+        "--source-ref",
+        default="local",
+        help="Repository tag or commit recorded in manifest v2 (default: local)",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     try:
-        manifest = install_skills(args.source, args.target, dry_run=args.dry_run)
+        manifest = install_skills(
+            args.source,
+            args.target,
+            dry_run=args.dry_run,
+            source_ref=args.source_ref,
+        )
     except InstallerError as exc:
         print(f"INSTALL ERROR: {exc}", file=sys.stderr)
         return 1

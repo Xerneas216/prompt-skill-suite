@@ -1,4 +1,0 @@
-interface:
-  display_name: "ProCraft · Review"
-  short_description: "Find and repair prompt package defects"
-  default_prompt: "In an active ProCraft workflow with a candidate package, use $reviewing-prompt-packages for static review and minimal repair."
